@@ -8,6 +8,7 @@ setup(
     description="Audio descriptor generating trasnformer",
     packages=find_packages(),
     install_requires=[
+        "librosa",
         "soundfile",
         "torch",
         "tqdm",
