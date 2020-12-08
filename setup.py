@@ -12,6 +12,5 @@ setup(
         "tqdm",
         "wandb",
     ],
-    setup_requires=["setuptools_scm"],
     # entry_points={"console_scripts": []},
 )
