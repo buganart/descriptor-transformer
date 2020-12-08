@@ -1,6 +1,6 @@
 # Descriptor Transformer
-![CI](https://github.com/buganart/descriptor-transformer/workflows/CI/badge.svg?branch=master)
-[![codecov](https://codecov.io/gh/buganart/descriptor-transformer/branch/master/graph/badge.svg)](https://codecov.io/gh/buganart/descriptor-transformer)
+![CI](https://github.com/buganart/descriptor-transformer/workflows/CI/badge.svg?branch=main)
+[![codecov](https://codecov.io/gh/buganart/descriptor-transformer/branch/main/graph/badge.svg)](https://codecov.io/gh/buganart/descriptor-transformer)
 
 Extract audio descriptors and learn to generate them with transformers.
 
