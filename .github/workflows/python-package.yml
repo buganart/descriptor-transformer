@@ -26,7 +26,7 @@ jobs:
         pip install -r requirements.txt
     - name: Check formatting
       run: |
-        black --check dialog
+        black --check desc tests
     - name: Lint with flake8
       run: |
         flake8
