@@ -8,7 +8,7 @@ Extract audio descriptors and learn to generate them with transformers.
 
 ### Generic
 
-Install `python >= 3.6` and CUDA suppo
+Install `python >= 3.6` and `pytorch` with GPU support if desired.
 
     pip install -r requirements.txt
 
