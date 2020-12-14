@@ -43,11 +43,13 @@ in this tutorial) can be easily adapted/composed.
 # of ``nn.TransformerEncoder`` model is sent to the final Linear
 # layer, which is followed by a log-Softmax function.
 #
+import sys
 
 import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 NUM_FEAT = 5
 
@@ -55,7 +57,6 @@ NUM_FEAT = 5
 class TransformerModel(nn.Module):
     def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5):
         super(TransformerModel, self).__init__()
-        from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
         self.model_type = "Transformer"
         self.pos_encoder = PositionalEncoding(ninp, dropout)
@@ -184,7 +185,8 @@ print("Device", device)
 import numpy as np
 
 # path = "data/ten-songs.npy"
-path = "data/sine5.npy"
+path = sys.argv[1]
+# "data/sine5.npy"
 print("dataset", path)
 train_data = np.load(path).astype(np.float32)
 train_data -= train_data.mean(axis=0, keepdims=True)
@@ -358,6 +360,10 @@ best_val_loss = float("inf")
 epochs = 100  # The number of epochs
 best_model = None
 
+val_loss = evaluate(model, val_data)
+print("-" * 89)
+print("| start | valid loss {:5.2f} ".format(val_loss))
+
 for epoch in range(1, epochs + 1):
     epoch_start_time = time.time()
     train()
@@ -365,8 +371,10 @@ for epoch in range(1, epochs + 1):
     print("-" * 89)
     print(
         "| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | "
-        "valid ppl {:8.2f}".format(
-            epoch, (time.time() - epoch_start_time), val_loss, val_loss
+        "".format(
+            epoch,
+            (time.time() - epoch_start_time),
+            val_loss,
         )
     )
     print("-" * 89)
