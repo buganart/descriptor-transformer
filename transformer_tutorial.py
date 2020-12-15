@@ -205,12 +205,12 @@ def batchify(data, bsz):
     # Trim off any extra elements that wouldn't cleanly fit (remainders).
     data = data.narrow(0, 0, nbatch * bsz)
     # Evenly divide the data across the bsz batches.
-    data = data.view(-1, bsz, NUM_FEAT).contiguous()
+    data = data.view(bsz, -1, NUM_FEAT).transpose(0, 1).contiguous()
     return data.to(device)
 
 
 batch_size = 20
-eval_batch_size = 10
+eval_batch_size = 100
 train_data = batchify(train_data, batch_size)
 val_data = batchify(val_data, eval_batch_size)
 test_data = batchify(test_data, eval_batch_size)
@@ -236,14 +236,15 @@ test_data = batchify(test_data, eval_batch_size)
 # ``N`` is along dimension 1.
 #
 
-bptt = 35
+# bptt = 35
+bptt = 50
 
 
-def get_batch(source, i):
-    seq_len = min(bptt, len(source) - 1 - i)
-    data = source[i : i + seq_len]
+def get_batch(source, batch_index):
+    seq_len = min(bptt, len(source) - 1 - batch_index)
+    data = source[batch_index : batch_index + seq_len]
     # target = source[i+1:i+1+seq_len].reshape(-1)
-    target = source[i + 1 : i + 1 + seq_len]
+    target = source[batch_index + 1 : batch_index + 1 + seq_len]
     return data, target
 
 
@@ -321,12 +322,11 @@ def train():
             print(
                 "| epoch {:3d} | {:5d}/{:5d} batches "
                 "| ms/batch {:5.2f} | "
-                "loss {:5.2f} | ppl {:8.2f}".format(
+                "loss {:5.4f}".format(
                     epoch,
                     batch,
                     len(train_data) // bptt,  # scheduler.get_lr()[0],
                     elapsed * 1000 / log_interval,
-                    cur_loss,
                     cur_loss,
                 )
             )
