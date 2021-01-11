@@ -2,11 +2,16 @@
 #! nix-shell -i bash -p curl jq nix
 set -exo pipefail
 
-if [ -z "$1" ]; then
-    commit_sha=$(curl 'https://api.github.com/repos/nixos/nixpkgs/commits?sha=master' | jq -r 'first.sha')
+owner="nixos"
+
+if [ ! -z "$2" ]; then
+    owner="$1"
+    rev="$2"
 else
-    commit_sha="$1"
+    rev="${1:-master}"
 fi
-url="https://github.com/nixos/nixpkgs/archive/${commit_sha}.tar.gz"
+
+resolved_rev=$(curl "https://api.github.com/repos/${owner}/nixpkgs/commits?sha=${rev}" | jq -r 'first.sha')
+url="https://github.com/${owner}/nixpkgs/archive/${resolved_rev}.tar.gz"
 digest=$(nix-prefetch-url --unpack "$url")
 echo "{\"url\": \"${url}\", \"sha256\": \"${digest}\"}" | jq '.' > nix/nixpkgs.json
