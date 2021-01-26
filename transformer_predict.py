@@ -1,11 +1,14 @@
 #!/usr/bin/env ipython
+from util import remove_outliers
 import torch
+import tqdm
 from torch import nn
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Device", device)
 
-from model import model, bptt, NUM_FEAT
+from util import remove_outliers
+from model import model, seq_len, NUM_FEAT
 
 
 # inputs = torch.ones([7, 2, 5])
@@ -41,19 +44,31 @@ def predict_step(model, inputs):
     )
 
 
-def predict(model, bptt, steps, context):
+def predict(model, seq_len, steps, context):
 
     seq = context
     n_context = context.shape[0]
 
-    for _ in range(steps):
+    for _ in tqdm.tqdm(range(steps)):
 
-        inputs = seq[-bptt:]
+        inputs = seq[-seq_len:]
         with torch.no_grad():
             output = predict_step(model, inputs)
+
+        # print("inputs", inputs)
+        # print("output", output)
+        # input()
         new_step = output[-1:].cpu()
+
+        # add a bit of noise
+        mag = output.cpu().std(axis=(0, 1)).reshape(1, 1, -1)
+        new_step = new_step + torch.randn(*new_step.shape) * mag
+
+        # print("inputs", inputs.cpu().numpy())
+        # print("new_step", new_step.cpu().numpy())
+        # print(input())
         seq = torch.cat([seq, new_step])
-        print("seq", seq.shape)
+        # print("seq", seq.shape)
 
     return seq[n_context:].squeeze(axis=1)
 
@@ -69,6 +84,9 @@ import sys
 
 path = sys.argv[1]
 train_data = np.load(path)[:, :NUM_FEAT].astype(np.float32)
+
+train_data = remove_outliers(train_data)
+
 
 # relative
 # train_data = train_data[1:, :] - train_data[:-1, :]
@@ -111,9 +129,9 @@ def batchify(data, bsz):
     return data
 
 
-context = batchify(train_data[-bptt:], 1)
+context = batchify(train_data[-seq_len:], 1)
 
-pred = predict(model, bptt, 2000, context)
+pred = predict(model, seq_len, 2000, context)
 
 train_data = unnormalize(train_data.detach().numpy())
 val_data = unnormalize(val_data.detach().numpy())

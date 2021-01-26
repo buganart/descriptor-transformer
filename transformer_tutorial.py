@@ -13,25 +13,14 @@ from torch.nn import (
     TransformerEncoderLayer,
 )
 
-from model import bptt, model, NUM_FEAT
+from util import remove_outliers
+from model import seq_len, model, NUM_FEAT
 
-epochs = 5  # The number of epochs
-
-# url = 'https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-2-v1.zip'
-# test_filepath, valid_filepath, train_filepath = extract_archive(download_from_url(url))
-# tokenizer = get_tokenizer('basic_english')
-# vocab = build_vocab_from_iterator(map(tokenizer,
-#                                       iter(io.open(train_filepath,
-#                                                    encoding="utf8"))))
-
-# def data_process(raw_text_iter):
-#   data = [torch.tensor([vocab[token] for token in tokenizer(item)],
-#                        dtype=torch.long) for item in raw_text_iter]
-#   return torch.cat(tuple(filter(lambda t: t.numel() > 0, data)))
-
-# train_data = data_process(iter(io.open(train_filepath, encoding="utf8")))
-# val_data = data_process(iter(io.open(valid_filepath, encoding="utf8")))
-# test_data = data_process(iter(io.open(test_filepath, encoding="utf8")))
+epochs = 20  # The number of epochs
+lr = 0.001  # learning rate
+gamma = 0.95
+batch_size = 20
+eval_batch_size = 100
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Device", device)
@@ -43,19 +32,21 @@ path = sys.argv[1]
 print("dataset", path)
 train_data = np.load(path)[:, :NUM_FEAT].astype(np.float32)
 
-# relative
-# train_data = train_data[1:, :] - train_data[:-1, :]
-
 # normalize
 train_data -= train_data.mean(axis=0, keepdims=True)
 train_data /= train_data.std(axis=0, keepdims=True)
 
-# train_data = train_data[:20]
 
-# n_use = 200_000
-# train_data = train_data[:n_use]
+train_data = remove_outliers(train_data)
+
+
+trivial_loss = np.mean((train_data[1:] - train_data[:-1]) ** 2)
+print(f"Trivial loss {trivial_loss}")
+
 
 all_data = torch.tensor(train_data).float().to(device)
+
+
 n_split = len(all_data) // 2
 
 train_data = all_data[:n_split]
@@ -73,8 +64,6 @@ def batchify(data, bsz):
     return data.to(device)
 
 
-batch_size = 20
-eval_batch_size = 100
 train_data = batchify(train_data, batch_size)
 val_data = batchify(val_data, eval_batch_size)
 test_data = batchify(test_data, eval_batch_size)
@@ -86,29 +75,12 @@ test_data = batchify(test_data, eval_batch_size)
 #
 
 
-######################################################################
-# ``get_batch()`` function generates the input and target sequence for
-# the transformer model. It subdivides the source data into chunks of
-# length ``bptt``. For the language modeling task, the model needs the
-# following words as ``Target``. For example, with a ``bptt`` value of 2,
-# we’d get the following two Variables for ``i`` = 0:
-#
-# .. image:: ../_static/img/transformer_input_target.png
-#
-# It should be noted that the chunks are along dimension 0, consistent
-# with the ``S`` dimension in the Transformer model. The batch dimension
-# ``N`` is along dimension 1.
-#
-
-
 def get_batch(source, batch_index):
-    # seq_len = min(bptt, len(source) - 1 - batch_index)
-    seq_len = bptt
+    # seq_len = min(seq_len, len(source) - 1 - batch_index)
     data = source[batch_index : batch_index + seq_len]
     # target = source[i+1:i+1+seq_len].reshape(-1)
     target = source[batch_index + 1 : batch_index + 1 + seq_len]
     return data, target
-    # return data, data  # for transformer with encoder and decoder
 
 
 ######################################################################
@@ -119,10 +91,9 @@ def get_batch(source, batch_index):
 # criterion = nn.CrossEntropyLoss()
 criterion = nn.MSELoss()
 # criterion = nn.L1Loss()
-lr = 0.001  # learning rate
-optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.5)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=gamma)
 
 import time
 
@@ -132,26 +103,18 @@ def train():
     total_loss = 0.0
     start_time = time.time()
 
-    batches = np.random.permutation(range(0, train_data.size(0) - bptt, bptt))
+    batches = np.random.permutation(range(0, train_data.size(0) - seq_len, seq_len))
     for batch_counter, i in enumerate(batches):
         data, targets = get_batch(train_data, i)
         optimizer.zero_grad()
 
         src_mask = model.generate_square_subsequent_mask(data.size(0)).to(device)
-        # tgt_mask = model.generate_no_peak_mask(targets.size(0)).to(device)
-
-        # tgt_mask = model.generate_square_subsequent_mask(targets.size(0)).to(device)
-        # tgt_mask = model.generate_square_subsequent_mask(targets.size(0)).to(device)
 
         output = model(
             data,
-            # targets,
             src_mask=src_mask,
-            # tgt_mask=tgt_mask,
         )
 
-        # loss = criterion(output.view(-1, ntokens), targets)
-        # loss = criterion(output[:-1], targets[1:])  # for nn.Transfomer
         loss = criterion(output, targets)
 
         loss.backward()
@@ -169,7 +132,7 @@ def train():
                 "loss {:5.4f}".format(
                     epoch,
                     batch_counter,
-                    len(train_data) // bptt,
+                    len(train_data) // seq_len,
                     scheduler.get_last_lr()[0],
                     elapsed * 1000 / log_interval,
                     cur_loss,
@@ -184,23 +147,16 @@ def evaluate(eval_model, data_source):
     total_loss = 0.0
 
     with torch.no_grad():
-        for i in range(0, data_source.size(0) - bptt, bptt):
+        for i in range(0, data_source.size(0) - seq_len, seq_len):
             data, targets = get_batch(data_source, i)
-            # print("data", data.shape, "targets", targets.shape)
 
             src_mask = model.generate_square_subsequent_mask(data.size(0)).to(device)
-            # tgt_mask = model.generate_no_peak_mask(targets.size(0)).to(device)
-            # tgt_mask = model.generate_square_subsequent_mask(data.size(0)).to(device)
 
             output = eval_model(
                 data,
-                # targets,
                 src_mask=src_mask,
-                # tgt_mask=tgt_mask,
             )
 
-            # output_flat = output.view(-1, ntokens)
-            # total_loss += len(data) * criterion(output_flat, targets).item()
             total_loss += len(data) * criterion(output, targets).item()
     return total_loss / (len(data_source) - 1)
 

@@ -1,19 +1,53 @@
-with import ./nix/nixpkgs.nix {};
+with import ./nix/nixpkgs.nix {
+  overlays = [
+
+    (self: super: let
+      overridePython = pypkgs: let
+        packageOverrides = pyself: pysuper: {
+            pytorch = pyself.pytorch-bin;
+        };
+        in pypkgs.override { inherit packageOverrides; };
+    in {
+      python38 = overridePython super.python38;
+      python37 = overridePython super.python37;
+      python36 = overridePython super.python36;
+    })
+
+  ];
+};
 
 let
-  py = python3;
+  py = python38;
 in
 mkShell {
   buildInputs = [
 
     entr
 
+    # matplotlib
+    gobjectIntrospection
+    gtk3
+
     (py.withPackages (ps: with ps; [
 
-      jupyter
-      pytorch-bin
+      # jupyter
+      pytorch
+      # pytorch-lightning
+
+      # poetry # Installing pytorch-forecasting from github requires.
+
+      cloudpickle
+      # optuna
+      scipy
+      scikitlearn
+      cloudpickle
+      statsmodels
+
       pandas
 
+      seaborn
+      matplotlib
+      pygobject3
 
       tqdm
       scikitlearn
