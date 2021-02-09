@@ -1,24 +1,13 @@
 import math
-import sys
 
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn import (
-    TransformerDecoder,
-    TransformerDecoderLayer,
-    TransformerEncoder,
-    TransformerEncoderLayer,
-)
 
 NUM_FEAT = 5
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# ntokens = len(vocab.stoi) # the size of vocabulary
-# ntokens = 999
 dim_pos_encoding = 50
 nhead = 5  # the number of heads in the multiheadattention models
-dropout = 0.1  # the dropout value
+dropout = 0.1
 positional_encoding_dropout = 0.0
 num_encoder_layers = 1
 num_decoder_layers = 1
@@ -62,20 +51,11 @@ class TransformerEncoderOnly(nn.Module):
         src = self.dropout(src)
         src = torch.einsum("bse->sbe", src)
 
-        # add a bit of noise
+        # Adds a bit of noise during training, XXX not sure this is useful or not
         if self.training:
             src = src + torch.randn(src.shape).to(device) * 0.05
 
-        # S N D
-        # src = self.encoder(src)  # * math.sqrt(NUM_FEAT)
-        # src = nn.ReLU()(src)
-
-        # S N E
-        # src = src.repeat(1, 1, int(np.round(self.dim_pos_encoding / NUM_FEAT)))
-        # src = src.repeat(1, 1, self.dim_pos_encoding)
-
         src = self.pos_encoder(src)
-        # print(src.shape)
 
         output = self.transformer_encoder(src, src_mask)
         output = self.decoder(output)
@@ -102,12 +82,9 @@ class PositionalEncoding(nn.Module):
             torch.arange(0, dim_pos_encoding, 2).float()
             * (-math.log(10000.0) / dim_pos_encoding)
         )
-        # print("position", position)
-        # print("div", div_term)
 
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
-        # pe[:, :] = position * torch.arange(0, dim_pos_encoding).float() / dim_pos_encoding
 
         pe = pe.unsqueeze(0).transpose(0, 1)
         self.register_buffer("pe", pe)

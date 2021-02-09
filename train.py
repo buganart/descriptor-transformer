@@ -1,23 +1,15 @@
-import io
-import math
 import sys
+import time
 
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn import (
-    TransformerDecoder,
-    TransformerDecoderLayer,
-    TransformerEncoder,
-    TransformerEncoderLayer,
-)
 
 from util import remove_outliers
 from model import seq_len, model, NUM_FEAT
 
-epochs = 20  # The number of epochs
-lr = 0.001  # learning rate
+epochs = 20
+lr = 0.001
 gamma = 0.95
 batch_size = 20
 eval_batch_size = 100
@@ -26,9 +18,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Device", device)
 
 
-# path = "data/ten-songs.npy"
 path = sys.argv[1]
-# "data/sine5.npy"
 print("dataset", path)
 train_data = np.load(path)[:, :NUM_FEAT].astype(np.float32)
 
@@ -41,7 +31,7 @@ train_data = remove_outliers(train_data)
 
 
 trivial_loss = np.mean((train_data[1:] - train_data[:-1]) ** 2)
-print(f"Trivial loss {trivial_loss}")
+print(f"Trivial loss (predicting no changes): {trivial_loss}")
 
 
 all_data = torch.tensor(train_data).float().to(device)
@@ -69,33 +59,16 @@ val_data = batchify(val_data, eval_batch_size)
 test_data = batchify(test_data, eval_batch_size)
 
 
-######################################################################
-# Functions to generate input and target sequence
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
-
-
 def get_batch(source, batch_index):
-    # seq_len = min(seq_len, len(source) - 1 - batch_index)
     data = source[batch_index : batch_index + seq_len]
-    # target = source[i+1:i+1+seq_len].reshape(-1)
+    # Shift target by one step.
     target = source[batch_index + 1 : batch_index + 1 + seq_len]
     return data, target
 
 
-######################################################################
-# Run the model
-# -------------
-#
-
-# criterion = nn.CrossEntropyLoss()
 criterion = nn.MSELoss()
-# criterion = nn.L1Loss()
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-# optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=gamma)
-
-import time
 
 
 def train():

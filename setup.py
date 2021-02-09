@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="dialog",
+    name="desc",
     version="0.1.0",
     url="https://github.com/buganart/descriptor-transformer",
     author="buganart",
@@ -9,6 +9,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         "librosa",
+        "matplotlib",
+        "pandas",
         "soundfile",
         "torch",
         "tqdm",
