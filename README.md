@@ -6,7 +6,7 @@ Extract audio descriptors and learn to generate them with transformers.
 
 ## Development
 
-### Generic
+### Option 1: Generic
 
 Install `python >= 3.6` and `pytorch` with GPU support if desired.
 
@@ -16,7 +16,7 @@ Run the tests
 
     pytest
 
-### Using nix and direnv
+### Option 2: Using nix and direnv
 
 1. Install the [nix](https://nixos.org/download.html) package manager
 and [direnv](https://direnv.net/).
@@ -32,7 +32,7 @@ First extract the audio features from `.wav` files in a folder (example
 
 To train the model and visualize predictions overlayed with real data
 
-    ./run features.npy
+    ./run my_features.npy
 
 Note: at the moment this concatenates all the features and thus generates some
 batches that share data from multiple audio files.
