@@ -26,6 +26,17 @@ class SimpleRNNModel(pl.LightningModule):
         self.linear = nn.Linear(hidden_size, descriptor_size)
         self.loss_function = nn.MSELoss()
 
+        self.model_ep_loss_list = []
+
+    def on_train_epoch_end(self, epoch_output):
+        log_dict = {"epoch": self.current_epoch}
+
+        loss = np.mean(self.model_ep_loss_list)
+        log_dict["loss"] = loss
+
+        wandb.log(log_dict)
+        self.model_ep_loss_list = []
+
     def forward(self, x):
         batch_size = x.shape[0]
         h = (
@@ -41,6 +52,8 @@ class SimpleRNNModel(pl.LightningModule):
         pred = self(data)
 
         loss = self.loss_function(pred, target)
+
+        self.model_ep_loss_list.append(loss.detach().cpu().numpy())
         return loss
 
     def configure_optimizers(self):
@@ -84,6 +97,17 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
             dim_feedforward=dim_feedforward,
         )
 
+        self.model_ep_loss_list = []
+
+    def on_train_epoch_end(self, epoch_output):
+        log_dict = {"epoch": self.current_epoch}
+
+        loss = np.mean(self.model_ep_loss_list)
+        log_dict["loss"] = loss
+
+        wandb.log(log_dict)
+        self.model_ep_loss_list = []
+
     def forward(self, src, src_mask):
         output = self.model(src, src_mask)
         return output
@@ -103,6 +127,8 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
         )
 
         loss = self.loss_function(output, target)
+
+        self.model_ep_loss_list.append(loss.detach().cpu().numpy())
         return loss
 
     def configure_optimizers(self):

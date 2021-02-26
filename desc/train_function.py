@@ -163,8 +163,6 @@ def main():
     config = Namespace(**config_dict)
     config.seed = 1234
 
-    config.num_layers = 3
-
     # run offline
     os.environ["WANDB_MODE"] = "dryrun"
 

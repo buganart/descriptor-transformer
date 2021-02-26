@@ -83,7 +83,6 @@ class DataModule_descriptor(pl.LightningDataModule):
         self.attribute_list = attribute_list
         self.dataset_input = np.concatenate(dataset_input, axis=0)
         self.dataset_target = np.concatenate(dataset_target, axis=0)
-        print("dataset_input", self.dataset_input.shape)
 
     def train_dataloader(self):
         batch_size = self.batch_size
