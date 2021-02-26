@@ -17,6 +17,12 @@ class DataModule_descriptor(pl.LightningDataModule):
         self.dataset_target = None
         self.window_size = config.window_size
         self.batch_size = config.batch_size
+        self.remove_outliers = config.remove_outliers
+
+    def remove_outliers_fn(self, x):
+        mean = x.mean(axis=0)
+        std = x.std(axis=0)
+        return np.array(x[(np.abs(x - mean) < std * 5).all(axis=1), :])
 
     # def prepare_data(self):
     #     pass
@@ -50,14 +56,23 @@ class DataModule_descriptor(pl.LightningDataModule):
                 # convert data into descriptor array
                 des_array = [j for (i, j) in sorted_data]
                 des_array = np.array(des_array)
-                num_des = des_array.shape[0]
+
+                # normalize data and remove outliers
+                des_array_mean = des_array.mean()
+                des_array_std = des_array.std()
+                des_array = (des_array - des_array_mean) / des_array_std
+                if self.remove_outliers:
+                    des_array = self.remove_outliers_fn(des_array)
+
                 # pack descriptors into batches based on window_size
+                num_des = des_array.shape[0]
+                if num_des <= window_size + 1:
+                    continue
                 input_array = []
                 target_array = []
                 for i in range(num_des - window_size - 1):
                     input_batch = des_array[i : i + window_size]
-                    target_batch = des_array[i + 1 + window_size]
-                    target_batch = target_batch[np.newaxis, :]
+                    target_batch = des_array[i + 1 : i + 1 + window_size]
                     input_array.append(input_batch)
                     target_array.append(target_batch)
 
@@ -68,6 +83,7 @@ class DataModule_descriptor(pl.LightningDataModule):
         self.attribute_list = attribute_list
         self.dataset_input = np.concatenate(dataset_input, axis=0)
         self.dataset_target = np.concatenate(dataset_target, axis=0)
+        print("dataset_input", self.dataset_input.shape)
 
     def train_dataloader(self):
         batch_size = self.batch_size

@@ -15,7 +15,7 @@ import pprint
 import wandb
 
 from desc.datamodule import DataModule_descriptor
-from desc.model import SampleModel
+from desc.model import SimpleRNNModel, TransformerEncoderOnlyModel
 from desc.helper_function import (
     SaveWandbCallback,
     save_checkpoint_to_cloud,
@@ -23,6 +23,14 @@ from desc.helper_function import (
     load_test_data,
     save_descriptor_as_json,
 )
+
+
+def _get_models(model_name):
+    if model_name == "RNN":
+        MODEL_CLASS = SimpleRNNModel
+    else:
+        MODEL_CLASS = TransformerEncoderOnlyModel
+    return MODEL_CLASS
 
 
 def save_model_args(config, run):
@@ -81,15 +89,18 @@ def setup_datamodule(config):
 
 def setup_model(config, run):
     checkpoint_path = str(Path(run.dir).absolute() / "checkpoint.ckpt")
+    selected_model = config.selected_model
+    # model
+    MODEL_CLASS = _get_models(config.selected_model)
 
     if config.resume_run_id:
         # Download file from the wandb cloud.
         load_checkpoint_from_cloud(checkpoint_path="checkpoint.ckpt")
         extra_trainer_args = {"resume_from_checkpoint": checkpoint_path}
-        model = SampleModel.load_from_checkpoint(checkpoint_path)
+        model = MODEL_CLASS.load_from_checkpoint(checkpoint_path)
     else:
         extra_trainer_args = {}
-        model = SampleModel(config)
+        model = MODEL_CLASS(config)
 
     return model, extra_trainer_args
 
@@ -137,11 +148,21 @@ def main():
         epochs=3,
         save_interval=2,
         notes="",
+        hidden_size=100,
+        num_layers=3,
+        remove_outliers=True,
+        selected_model="Transformer",
+        descriptor_size=5,
+        dim_pos_encoding=50,
+        nhead=5,
+        num_encoder_layers=1,
+        dropout=0.1,
+        positional_encoding_dropout=0,
+        dim_feedforward=128,
     )
     config = Namespace(**config_dict)
     config.seed = 1234
-    config.descriptor_size = 5
-    config.hidden_size = 100
+
     config.num_layers = 3
 
     # run offline
