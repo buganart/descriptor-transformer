@@ -20,7 +20,6 @@ from desc.helper_function import (
     SaveWandbCallback,
     save_checkpoint_to_cloud,
     load_checkpoint_from_cloud,
-    load_test_data,
     save_descriptor_as_json,
 )
 
