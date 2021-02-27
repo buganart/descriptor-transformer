@@ -114,7 +114,8 @@ class DataModule_descriptor(pl.LightningDataModule):
                 # process data for prediction
                 last_descriptors = des_array[np.newaxis, -window_size:, :]
                 test_input.append(last_descriptors)
-                test_filename.append(str(path))
+                # also record filename, trim to 20 chars
+                test_filename.append(str(path.stem)[:20])
 
         if self.isTrain:
             # calculate mean and std

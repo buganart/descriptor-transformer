@@ -60,8 +60,8 @@ def save_descriptor_as_json(save_path, data, dataindex, datamodule, resume_run_i
             current_timestamp = current_timestamp + interval
 
         # save to json
-        # find data source name, trim name to 20 chars
-        data_source_name = datamodule.test_filename[data_index][:20]
+        # find data source name
+        data_source_name = datamodule.test_filename[data_index]
 
         filename = str(data_source_name) + "_predicted_" + str(i) + ".txt"
         if resume_run_id:
