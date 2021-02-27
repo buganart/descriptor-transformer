@@ -79,11 +79,30 @@ def init_wandb_run(config, run_dir="./", mode="run"):
     return run
 
 
-def setup_datamodule(config, isTrain=True):
+def setup_datamodule(config, run, isTrain=True):
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
 
     dataModule = DataModule_descriptor(config, isTrain)
+    dataModule.setup()
+    if isTrain:
+        # save mean std to npz
+        data_stat_path = str(Path(run.dir).absolute() / "data_stat.npz")
+        np.savez(
+            data_stat_path,
+            mean=dataModule.dataset_mean,
+            std=dataModule.dataset_std,
+        )
+        save_checkpoint_to_cloud(data_stat_path)
+    else:
+        # load mean std from npz and write to datamodule
+        load_checkpoint_from_cloud(checkpoint_path="data_stat.npz")
+        data_stat_path = str(Path(run.dir).absolute() / "data_stat.npz")
+        dataFile = np.load(self.savefile_path)
+        mean = dataFile["mean"]
+        std = dataFile["std"]
+        dataModule.dataset_mean = mean
+        dataModule.dataset_std = std
     return dataModule
 
 
@@ -167,7 +186,7 @@ def main():
     os.environ["WANDB_MODE"] = "dryrun"
 
     run = init_wandb_run(config, run_dir=config.experiment_dir, mode="offline")
-    datamodule = setup_datamodule(config)
+    datamodule = setup_datamodule(config, run)
     model, extra_trainer_args = setup_model(config, run)
     train(config, run, model, datamodule, extra_trainer_args)
 
@@ -180,16 +199,13 @@ def main():
     # model, _ = setup_model(config, run)
     # model.eval()
     # # construct test_data
-    # test_data, audio_info = load_test_data(config, "../tests/test_descriptor.txt")
-    testdatamodule = setup_datamodule(config, isTrain=False)
-    testdatamodule.setup()
-    test_dataloader = testdatamodule.test_dataloader(
-        datamodule.dataset_mean, datamodule.dataset_std
-    )
-    test_data, filenames = next(iter(test_dataloader))
-    pred = model.predict(test_data, 5)
 
-    # prediction = model.predict(test_data, 10)
+    # testdatamodule = setup_datamodule(config, run, isTrain=False)
+    # test_dataloader = testdatamodule.test_dataloader(
+    #     datamodule.dataset_mean, datamodule.dataset_std
+    # )
+    # test_data, filenames = next(iter(test_dataloader))
+    # pred = model.predict(test_data, 5)
 
     # save_descriptor_as_json(data_location, prediction, audio_info)
 

@@ -143,11 +143,12 @@ class DataModule_descriptor(pl.LightningDataModule):
         return dataloader
 
     #
-    def test_dataloader(self, train_mean, train_std):
+    def test_dataloader(self):
         batch_size = self.batch_size
         dataset = TensorDataset(
             torch.tensor(
-                (self.test_input - train_mean) / train_std, dtype=torch.float32
+                (self.test_input - self.dataset_mean) / self.dataset_std,
+                dtype=torch.float32,
             ),
             torch.tensor(range(len(self.test_filename))),
         )
