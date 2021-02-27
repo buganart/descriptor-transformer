@@ -27,6 +27,8 @@ class DataModule_descriptor(pl.LightningDataModule):
         #
         self.test_input = None
         self.test_filename = None
+        self.interval = -1
+        self.last_timestamp = []
 
     def _remove_outliers_fn(self, x):
         mean = x.mean(axis=0)
@@ -56,6 +58,10 @@ class DataModule_descriptor(pl.LightningDataModule):
             des_array = [j for (i, j) in sorted_data]
             des_array = np.array(des_array)
 
+            # calculate interval and record last timestamp
+            last_timestamp = sorted_data[-1][0]
+            self.last_timestamp.append(last_timestamp)
+            self.interval = sorted_data[-1][0] - sorted_data[-2][0]
         return des_array
 
     def _descriptor_batchify(self, des_array, window_size):
@@ -109,7 +115,6 @@ class DataModule_descriptor(pl.LightningDataModule):
                 last_descriptors = des_array[np.newaxis, -window_size:, :]
                 test_input.append(last_descriptors)
                 test_filename.append(str(path))
-                print(path)
 
         if self.isTrain:
             # calculate mean and std

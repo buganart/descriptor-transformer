@@ -35,46 +35,14 @@ def load_checkpoint_from_cloud(checkpoint_path="model_dict.pth"):
 
 ####
 # for prediction script
-def load_test_data(config, test_data_path):
-    test_data_path = Path(test_data_path)
-    window_size = config.window_size
-
-    attribute_list = []
-    des_array = None
-
-    with open(test_data_path) as json_file:
-        data = json.load(json_file)
-        data_list = []
-        for des in data:
-            timestamp = next(iter(des))
-            descriptor = des[timestamp]
-            if len(attribute_list) == 0:
-                attribute_list = descriptor.keys()
-                attribute_list = sorted(attribute_list)
-            values = []
-            for k in attribute_list:
-                values.append(float(descriptor[k]))
-            data_list.append((int(timestamp), values))
-        # sort value by timestamp
-        sorted_data = sorted(data_list)
-        # convert data into descriptor array
-        des_array = [j for (i, j) in sorted_data]
-    des_array = np.array(des_array)
-    #   cut according to the window size
-    des_array = des_array[np.newaxis, -window_size:, :]
-    #   also need to record attribute_list and timeframe for saving
-    last_timestamp = sorted_data[-1][0]
-    interval = sorted_data[-1][0] - sorted_data[-2][0]
-    return torch.tensor(des_array, dtype=torch.float32), (
-        int(last_timestamp),
-        int(interval),
-        attribute_list,
-    )
 
 
-def save_descriptor_as_json(save_path, data, audio_info, resume_run_id=None):
+def save_descriptor_as_json(save_path, data, fileindex, datamodule, resume_run_id=None):
     save_path = Path(save_path)
-    last_timestamp, interval, attribute_list = audio_info
+    last_timestamp = datamodule.last_timestamp
+    interval = datamodule.interval
+    attribute_list = datamodule.attribute_list
+
     current_timestamp = last_timestamp + interval
     num_data, prediction_length, _ = data.shape
     for i in range(num_data):
@@ -91,7 +59,11 @@ def save_descriptor_as_json(save_path, data, audio_info, resume_run_id=None):
             current_timestamp = current_timestamp + interval
 
         # save to json
-        filename = "predicted_" + str(i) + ".txt"
+        # find data source name, trim name to 20 chars
+        data_source_index = fileindex[i]
+        data_source_name = datamodule.test_filename[data_source_index][:20]
+
+        filename = str(data_source_name) + "_predicted_" + str(i) + ".txt"
         if resume_run_id:
             filename = str(resume_run_id) + "_" + filename
         json_path = save_path / filename

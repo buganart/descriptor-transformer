@@ -98,7 +98,7 @@ def setup_datamodule(config, run, isTrain=True):
         # load mean std from npz and write to datamodule
         load_checkpoint_from_cloud(checkpoint_path="data_stat.npz")
         data_stat_path = str(Path(run.dir).absolute() / "data_stat.npz")
-        dataFile = np.load(self.savefile_path)
+        dataFile = np.load(data_stat_path)
         mean = dataFile["mean"]
         std = dataFile["std"]
         dataModule.dataset_mean = mean
