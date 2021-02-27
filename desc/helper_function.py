@@ -37,15 +37,16 @@ def load_checkpoint_from_cloud(checkpoint_path="model_dict.pth"):
 # for prediction script
 
 
-def save_descriptor_as_json(save_path, data, fileindex, datamodule, resume_run_id=None):
+def save_descriptor_as_json(save_path, data, dataindex, datamodule, resume_run_id=None):
     save_path = Path(save_path)
-    last_timestamp = datamodule.last_timestamp
-    interval = datamodule.interval
+    interval = int(datamodule.interval)
     attribute_list = datamodule.attribute_list
 
-    current_timestamp = last_timestamp + interval
     num_data, prediction_length, _ = data.shape
     for i in range(num_data):
+        data_index = dataindex[i]
+        last_timestamp = int(datamodule.last_timestamp[data_index])
+        current_timestamp = last_timestamp + interval
         # for each data, save 1 json file
         stored = []
         for j in range(prediction_length):
@@ -60,8 +61,7 @@ def save_descriptor_as_json(save_path, data, fileindex, datamodule, resume_run_i
 
         # save to json
         # find data source name, trim name to 20 chars
-        data_source_index = fileindex[i]
-        data_source_name = datamodule.test_filename[data_source_index][:20]
+        data_source_name = datamodule.test_filename[data_index][:20]
 
         filename = str(data_source_name) + "_predicted_" + str(i) + ".txt"
         if resume_run_id:
