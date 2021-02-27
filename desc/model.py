@@ -29,14 +29,6 @@ class SimpleRNNModel(pl.LightningModule):
         self.loss_function = nn.MSELoss()
 
         self.model_ep_loss_list = []
-        self.dataset_mean = None
-        self.dataset_std = None
-
-    def on_train_epoch_start(self):
-        # store dataset mean and std
-        if self.dataset_mean is None:
-            self.dataset_mean = self.trainer.datamodule.dataset_mean
-            self.dataset_std = self.trainer.datamodule.dataset_std
 
     def on_train_epoch_end(self, epoch_output):
         log_dict = {"epoch": self.current_epoch}
@@ -50,8 +42,8 @@ class SimpleRNNModel(pl.LightningModule):
     def forward(self, x):
         batch_size = x.shape[0]
         h = (
-            torch.zeros(self.num_layers, batch_size, self.hidden_size),
-            torch.zeros(self.num_layers, batch_size, self.hidden_size),
+            torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
+            torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
         )
         x, _ = self.lstm(x, h)
         x = self.linear(x)
@@ -109,14 +101,6 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
         )
 
         self.model_ep_loss_list = []
-        self.dataset_mean = None
-        self.dataset_std = None
-
-    def on_train_epoch_start(self):
-        # store dataset mean and std
-        if self.dataset_mean is None:
-            self.dataset_mean = self.trainer.datamodule.dataset_mean
-            self.dataset_std = self.trainer.datamodule.dataset_std
 
     def on_train_epoch_end(self, epoch_output):
         log_dict = {"epoch": self.current_epoch}

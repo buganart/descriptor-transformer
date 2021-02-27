@@ -184,7 +184,7 @@ def main():
     testdatamodule = setup_datamodule(config, isTrain=False)
     testdatamodule.setup()
     test_dataloader = testdatamodule.test_dataloader(
-        model.dataset_mean, model.dataset_std
+        datamodule.dataset_mean, datamodule.dataset_std
     )
     test_data, filenames = next(iter(test_dataloader))
     pred = model.predict(test_data, 5)
