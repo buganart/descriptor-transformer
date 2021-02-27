@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 
+import wandb
+
 
 ########################
 #   model
@@ -27,6 +29,14 @@ class SimpleRNNModel(pl.LightningModule):
         self.loss_function = nn.MSELoss()
 
         self.model_ep_loss_list = []
+        self.dataset_mean = None
+        self.dataset_std = None
+
+    def on_train_epoch_start(self):
+        # store dataset mean and std
+        if self.dataset_mean is None:
+            self.dataset_mean = self.trainer.datamodule.dataset_mean
+            self.dataset_std = self.trainer.datamodule.dataset_std
 
     def on_train_epoch_end(self, epoch_output):
         log_dict = {"epoch": self.current_epoch}
@@ -63,9 +73,10 @@ class SimpleRNNModel(pl.LightningModule):
         all_descriptors = data
         batch_size, window_size, des_size = data.shape
         for i in range(step):
-            input = all_descriptors[:, i:, :]
-            # print("input", input)
-            pred = self(input)
+            input_data = all_descriptors[:, i:, :]
+            # print("input_data", input_data)
+            with torch.no_grad():
+                pred = self(input_data)
             new_descriptor = pred[:, -1, :].reshape(batch_size, 1, des_size)
             # print("new_descriptor", new_descriptor)
             all_descriptors = torch.cat((all_descriptors, new_descriptor), 1)
@@ -98,6 +109,14 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
         )
 
         self.model_ep_loss_list = []
+        self.dataset_mean = None
+        self.dataset_std = None
+
+    def on_train_epoch_start(self):
+        # store dataset mean and std
+        if self.dataset_mean is None:
+            self.dataset_mean = self.trainer.datamodule.dataset_mean
+            self.dataset_std = self.trainer.datamodule.dataset_std
 
     def on_train_epoch_end(self, epoch_output):
         log_dict = {"epoch": self.current_epoch}
@@ -136,6 +155,22 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
         return [optimizer], [scheduler]
 
+    def predict(self, data, step):
+        all_descriptors = data
+        batch_size, window_size, des_size = data.shape
+        for i in range(step):
+            input_data = all_descriptors[:, i:, :]
+            # print("input_data", input_data)
+            with torch.no_grad():
+                src_mask = self.model.generate_square_subsequent_mask(
+                    input_data.size(1)
+                ).type_as(data)
+                pred = self.model(input_data, src_mask=src_mask)
+            new_descriptor = pred[:, -1, :].reshape(batch_size, 1, des_size)
+            # print("new_descriptor", new_descriptor)
+            all_descriptors = torch.cat((all_descriptors, new_descriptor), 1)
+        return all_descriptors.detach().cpu().numpy()[:, -step:, :]
+
 
 ########################
 #   components
@@ -163,7 +198,9 @@ class TransformerEncoderOnly(nn.Module):
         self.decoder = nn.Linear(self.d_model, descriptor_size)
 
         self.pos_encoder = PositionalEncoding(
-            dim_pos_encoding, dropout=positional_encoding_dropout
+            dim_pos_encoding,
+            dropout=positional_encoding_dropout,
+            dtype=self.decoder.weight,
         )
         self.encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.d_model,
@@ -203,16 +240,18 @@ class TransformerEncoderOnly(nn.Module):
 
 # Note that this input order is "SBE"
 class PositionalEncoding(nn.Module):
-    def __init__(self, dim_pos_encoding, dropout=0.1, max_len=5000):
+    def __init__(
+        self, dim_pos_encoding, dropout=0.1, max_len=5000, dtype=torch.float64
+    ):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
-        pe = torch.zeros(max_len, dim_pos_encoding)
-        position = torch.arange(0, max_len).unsqueeze(1)
+        pe = torch.zeros(max_len, dim_pos_encoding).type_as(dtype)
+        position = torch.arange(0, max_len).type_as(dtype).unsqueeze(1)
         div_term = torch.exp(
             torch.arange(0, dim_pos_encoding, 2)
             * (-torch.log(torch.tensor(10000.0)) / dim_pos_encoding)
-        )
+        ).type_as(dtype)
 
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)

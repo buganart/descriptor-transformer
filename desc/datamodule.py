@@ -9,86 +9,147 @@ import pytorch_lightning as pl
 
 
 class DataModule_descriptor(pl.LightningDataModule):
-    def __init__(self, config):
+    def __init__(self, config, isTrain=True):
         super().__init__()
         self.data_path = Path(config.audio_db_dir)
-        self.attribute_list = None
-        self.dataset_input = None
-        self.dataset_target = None
+        self.isTrain = isTrain
         self.window_size = config.window_size
         self.batch_size = config.batch_size
         self.remove_outliers = config.remove_outliers
 
-    def remove_outliers_fn(self, x):
+        self.dataset_input = None
+        self.dataset_target = None
+
+        self.attribute_list = []
+        self.dataset_mean = None
+        self.dataset_std = None
+
+        #
+        self.test_input = None
+        self.test_filename = None
+
+    def _remove_outliers_fn(self, x):
         mean = x.mean(axis=0)
         std = x.std(axis=0)
         return np.array(x[(np.abs(x - mean) < std * 5).all(axis=1), :])
 
     # def prepare_data(self):
     #     pass
+
+    def _load_descriptor_list(self, path):
+        with open(path) as json_file:
+            data = json.load(json_file)
+            data_list = []
+            for des in data:
+                timestamp = next(iter(des))
+                descriptor = des[timestamp]
+                if len(self.attribute_list) == 0:
+                    self.attribute_list = descriptor.keys()
+                    self.attribute_list = sorted(self.attribute_list)
+                values = []
+                for k in self.attribute_list:
+                    values.append(float(descriptor[k]))
+                data_list.append((int(timestamp), values))
+            # sort value by timestamp
+            sorted_data = sorted(data_list)
+            # convert data into descriptor array
+            des_array = [j for (i, j) in sorted_data]
+            des_array = np.array(des_array)
+
+        return des_array
+
+    def _descriptor_batchify(self, des_array, window_size):
+        # pack descriptors into batches based on window_size
+        num_des = des_array.shape[0]
+        input_array = []
+        target_array = []
+        for i in range(num_des - window_size - 1):
+            input_batch = des_array[i : i + window_size]
+            target_batch = des_array[i + 1 : i + 1 + window_size]
+            input_array.append(input_batch)
+            target_array.append(target_batch)
+        return input_array, target_array
+
     def setup(self, stage=None):
         window_size = self.window_size
         filepath_list = self.data_path.rglob("*.*")
         # check files in filepath_list is supported (by extensions)
         filepath_list = [path for path in filepath_list if Path(path).suffix == ".txt"]
 
-        attribute_list = []
+        all_desc = []
+
         dataset_input = []
         dataset_target = []
+
+        test_input = []
+        test_filename = []
+
         # process files in the filepath_list
         for path in tqdm.tqdm(filepath_list, desc="Descriptor Files"):
+            des_array = self._load_descriptor_list(path)
+            # remove outliers
+            if self.remove_outliers:
+                des_array = self._remove_outliers_fn(des_array)
+                # record all descriptor for statistics
+            all_desc.append(des_array)
+            num_des = des_array.shape[0]
 
-            with open(path) as json_file:
-                data = json.load(json_file)
-                data_list = []
-                for des in data:
-                    timestamp = next(iter(des))
-                    descriptor = des[timestamp]
-                    if len(attribute_list) == 0:
-                        attribute_list = descriptor.keys()
-                        attribute_list = sorted(attribute_list)
-                    values = []
-                    for k in attribute_list:
-                        values.append(float(descriptor[k]))
-                    data_list.append((int(timestamp), values))
-                # sort value by timestamp
-                sorted_data = sorted(data_list)
-                # convert data into descriptor array
-                des_array = [j for (i, j) in sorted_data]
-                des_array = np.array(des_array)
-
-                # normalize data and remove outliers
-                des_array_mean = des_array.mean()
-                des_array_std = des_array.std()
-                des_array = (des_array - des_array_mean) / des_array_std
-                if self.remove_outliers:
-                    des_array = self.remove_outliers_fn(des_array)
-
-                # pack descriptors into batches based on window_size
-                num_des = des_array.shape[0]
-                if num_des <= window_size + 1:
-                    continue
-                input_array = []
-                target_array = []
-                for i in range(num_des - window_size - 1):
-                    input_batch = des_array[i : i + window_size]
-                    target_batch = des_array[i + 1 : i + 1 + window_size]
-                    input_array.append(input_batch)
-                    target_array.append(target_batch)
-
+            if num_des <= window_size + 1:
+                continue
+            if self.isTrain:
+                # process as train data
+                input_array, target_array = self._descriptor_batchify(
+                    des_array, window_size
+                )
                 # add processed array to dataset
                 dataset_input.append(input_array)
                 dataset_target.append(target_array)
+            else:
+                # process data for prediction
+                last_descriptors = des_array[np.newaxis, -window_size:, :]
+                test_input.append(last_descriptors)
+                test_filename.append(str(path))
+                print(path)
 
-        self.attribute_list = attribute_list
-        self.dataset_input = np.concatenate(dataset_input, axis=0)
-        self.dataset_target = np.concatenate(dataset_target, axis=0)
+        if self.isTrain:
+            # calculate mean and std
+            # all_desc in shape (NUM_DESC, NUM_FEAT)
+            all_desc = np.concatenate(all_desc, axis=0)
+            self.dataset_mean = all_desc.mean(axis=0)
+            self.dataset_std = all_desc.std(axis=0)
+            # data input/target in shape (NUM_BATCH, WINDOW_SIZE, NUM_FEAT)
+            self.dataset_input = np.concatenate(dataset_input, axis=0)
+            self.dataset_target = np.concatenate(dataset_target, axis=0)
+            # normalize data
+            self.dataset_input = (
+                self.dataset_input - self.dataset_mean
+            ) / self.dataset_std
+            self.dataset_target = (
+                self.dataset_target - self.dataset_mean
+            ) / self.dataset_std
+        else:
+            self.test_input = np.concatenate(test_input, axis=0)
+            self.test_filename = test_filename
 
     def train_dataloader(self):
         batch_size = self.batch_size
         dataset = TensorDataset(
             torch.tensor(self.dataset_input, dtype=torch.float32),
             torch.tensor(self.dataset_target, dtype=torch.float32),
+        )
+        dataloader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=True, num_workers=8
+        )
+        return dataloader
+
+    #
+    def test_dataloader(self, train_mean, train_std):
+        batch_size = self.batch_size
+        dataset = TensorDataset(
+            torch.tensor(
+                (self.test_input - train_mean) / train_std, dtype=torch.float32
+            ),
+            torch.tensor(range(len(self.test_filename))),
         )
         dataloader = DataLoader(
             dataset, batch_size=batch_size, shuffle=True, num_workers=8

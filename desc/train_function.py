@@ -79,11 +79,11 @@ def init_wandb_run(config, run_dir="./", mode="run"):
     return run
 
 
-def setup_datamodule(config):
+def setup_datamodule(config, isTrain=True):
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
 
-    dataModule = DataModule_descriptor(config)
+    dataModule = DataModule_descriptor(config, isTrain)
     return dataModule
 
 
@@ -181,6 +181,13 @@ def main():
     # model.eval()
     # # construct test_data
     # test_data, audio_info = load_test_data(config, "../tests/test_descriptor.txt")
+    testdatamodule = setup_datamodule(config, isTrain=False)
+    testdatamodule.setup()
+    test_dataloader = testdatamodule.test_dataloader(
+        model.dataset_mean, model.dataset_std
+    )
+    test_data, filenames = next(iter(test_dataloader))
+    pred = model.predict(test_data, 5)
 
     # prediction = model.predict(test_data, 10)
 
