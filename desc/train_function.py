@@ -106,16 +106,33 @@ def setup_datamodule(config, run, isTrain=True):
 
 
 def setup_model(config, run):
-    checkpoint_path = str(Path(run.dir).absolute() / "checkpoint.ckpt")
     selected_model = config.selected_model
     # model
     MODEL_CLASS = _get_models(config.selected_model)
 
     if config.resume_run_id:
-        # Download file from the wandb cloud.
-        load_checkpoint_from_cloud(checkpoint_path="checkpoint.ckpt")
-        extra_trainer_args = {"resume_from_checkpoint": checkpoint_path}
-        model = MODEL_CLASS.load_from_checkpoint(checkpoint_path)
+        checkpoint_path = str(Path(run.dir).absolute() / "checkpoint.ckpt")
+        checkpoint_prev_path = str(Path(run.dir).absolute() / "checkpoint_prev.ckpt")
+        new_ckpt_loaded = False
+        try:
+            # Download file from the wandb cloud.
+            load_checkpoint_from_cloud(checkpoint_path="checkpoint.ckpt")
+            extra_trainer_args = {"resume_from_checkpoint": checkpoint_path}
+            model = MODEL_CLASS.load_from_checkpoint(checkpoint_path)
+            new_ckpt_loaded = True
+        except:
+            # Download previous successfully loaded checkpoint file
+            load_checkpoint_from_cloud(checkpoint_path="checkpoint_prev.ckpt")
+            extra_trainer_args = {"resume_from_checkpoint": checkpoint_prev_path}
+            model = MODEL_CLASS.load_from_checkpoint(checkpoint_prev_path)
+
+        if new_ckpt_loaded:
+            print(
+                "checkpoint loaded. Save a copy of successfully loaded checkpoint to the cloud."
+            )
+            # save successfully loaded checkpoint file as checkpoint_prev.ckpt
+            os.rename(checkpoint_path, checkpoint_prev_path)
+            save_checkpoint_to_cloud(checkpoint_prev_path)
     else:
         extra_trainer_args = {}
         model = MODEL_CLASS(config)
