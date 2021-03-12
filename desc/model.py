@@ -45,9 +45,9 @@ class SimpleRNNModel(pl.LightningModule):
             torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
             torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
         )
-        out, (h_out, _) = self.lstm(x, h)
-        h_out = h_out.view(-1, self.hidden_size)
-        out = self.linear(h_out)
+        out, _ = self.lstm(x, h)
+        out = out[:, -1, :]
+        out = self.linear(out)
         return out
 
     def training_step(self, batch, batch_idx):
