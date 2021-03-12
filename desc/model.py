@@ -45,15 +45,16 @@ class SimpleRNNModel(pl.LightningModule):
             torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
             torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
         )
-        x, _ = self.lstm(x, h)
-        x = self.linear(x)
-        return x
+        out, (h_out, _) = self.lstm(x, h)
+        h_out = h_out.view(-1, self.hidden_size)
+        out = self.linear(h_out)
+        return out
 
     def training_step(self, batch, batch_idx):
         data, target = batch
         pred = self(data)
 
-        loss = self.loss_function(pred, target)
+        loss = self.loss_function(pred, target[:, -1, :])
 
         self.model_ep_loss_list.append(loss.detach().cpu().numpy())
         return loss
@@ -69,7 +70,7 @@ class SimpleRNNModel(pl.LightningModule):
             # print("input_data", input_data)
             with torch.no_grad():
                 pred = self(input_data)
-            new_descriptor = pred[:, -1, :].reshape(batch_size, 1, des_size)
+            new_descriptor = pred.reshape(batch_size, 1, des_size)
             # print("new_descriptor", new_descriptor)
             all_descriptors = torch.cat((all_descriptors, new_descriptor), 1)
         return all_descriptors.detach().cpu().numpy()[:, -step:, :]
