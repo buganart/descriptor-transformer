@@ -213,7 +213,7 @@ def main():
     # config.resume_run_id = resume_run_id
     # run = init_wandb_run(config, run_dir="./", mode="offline")
     # model, _ = setup_model(config, run)
-    # model.eval()
+    model.eval()
     # # construct test_data
 
     # testdatamodule = setup_datamodule(config, run, isTrain=False)
@@ -221,8 +221,10 @@ def main():
     #     datamodule.dataset_mean, datamodule.dataset_std
     # )
     # test_data, filenames = next(iter(test_dataloader))
-    # pred = model.predict(test_data, 5)
-
+    test_dataloader = datamodule.train_dataloader()
+    test_data = next(iter(test_dataloader))[0]
+    pred = model.predict(test_data, 5)
+    print("pred.shape", pred.shape)
     # save_descriptor_as_json(data_location, prediction, audio_info)
 
 

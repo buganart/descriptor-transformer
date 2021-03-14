@@ -39,22 +39,29 @@ class SimpleRNNModel(pl.LightningModule):
         wandb.log(log_dict)
         self.model_ep_loss_list = []
 
-    def forward(self, x):
+    def forward(self, x, hidden=None):
         batch_size = x.shape[0]
-        h = (
-            torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
-            torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
-        )
-        out, _ = self.lstm(x, h)
+        if hidden is not None:
+            h = hidden
+        else:
+            h = (
+                torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
+                torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
+            )
+        out, h2 = self.lstm(x, h)
         out = out[:, -1, :]
         out = self.linear(out)
-        return out
+        if hidden is not None:
+            return out, h2
+        else:
+            return out
 
     def training_step(self, batch, batch_idx):
-        data, target = batch
+        data = batch[0]
+        data, target = data[:, :-1, :], data[:, -1, :]
         pred = self(data)
 
-        loss = self.loss_function(pred, target[:, -1, :])
+        loss = self.loss_function(pred, target)
 
         self.model_ep_loss_list.append(loss.detach().cpu().numpy())
         return loss
@@ -63,13 +70,19 @@ class SimpleRNNModel(pl.LightningModule):
         return torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
 
     def predict(self, data, step):
-        all_descriptors = data
         batch_size, window_size, des_size = data.shape
+        all_descriptors = data
+        new_descriptor = data
+        h = (
+            torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(data),
+            torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(data),
+        )
+
         for i in range(step):
-            input_data = all_descriptors[:, i:, :]
+            # input_data = all_descriptors[:, i:, :]
             # print("input_data", input_data)
             with torch.no_grad():
-                pred = self(input_data)
+                pred, h = self(new_descriptor, h)
             new_descriptor = pred.reshape(batch_size, 1, des_size)
             # print("new_descriptor", new_descriptor)
             all_descriptors = torch.cat((all_descriptors, new_descriptor), 1)
@@ -121,7 +134,8 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
         return mask
 
     def training_step(self, batch, batch_idx):
-        data, target = batch
+        data = batch[0]
+        data, target = data[:, :-1, :], data[:, 1:, :]
         # Note that data shape (BSE)
         src_mask = self.generate_square_subsequent_mask(data.size(1)).type_as(data)
 

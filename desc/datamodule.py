@@ -68,13 +68,10 @@ class DataModule_descriptor(pl.LightningDataModule):
         # pack descriptors into batches based on window_size
         num_des = des_array.shape[0]
         input_array = []
-        target_array = []
-        for i in range(num_des - window_size - 1):
+        for i in range(num_des - window_size):
             input_batch = des_array[i : i + window_size]
-            target_batch = des_array[i + 1 : i + 1 + window_size]
             input_array.append(input_batch)
-            target_array.append(target_batch)
-        return input_array, target_array
+        return input_array
 
     def setup(self, stage=None):
         window_size = self.window_size
@@ -85,7 +82,6 @@ class DataModule_descriptor(pl.LightningDataModule):
         all_desc = []
 
         dataset_input = []
-        dataset_target = []
 
         test_input = []
         test_filename = []
@@ -104,12 +100,9 @@ class DataModule_descriptor(pl.LightningDataModule):
                 continue
             if self.isTrain:
                 # process as train data
-                input_array, target_array = self._descriptor_batchify(
-                    des_array, window_size
-                )
+                input_array = self._descriptor_batchify(des_array, window_size)
                 # add processed array to dataset
                 dataset_input.append(input_array)
-                dataset_target.append(target_array)
             else:
                 # process data for prediction
                 last_descriptors = des_array[np.newaxis, -window_size:, :]
@@ -123,15 +116,12 @@ class DataModule_descriptor(pl.LightningDataModule):
             all_desc = np.concatenate(all_desc, axis=0)
             self.dataset_mean = all_desc.mean(axis=0)
             self.dataset_std = all_desc.std(axis=0)
-            # data input/target in shape (NUM_BATCH, WINDOW_SIZE, NUM_FEAT)
+            # data input in shape (NUM_BATCH, WINDOW_SIZE, NUM_FEAT)
             self.dataset_input = np.concatenate(dataset_input, axis=0)
-            self.dataset_target = np.concatenate(dataset_target, axis=0)
+            print("dataset shape:", self.dataset_input.shape)
             # normalize data
             self.dataset_input = (
                 self.dataset_input - self.dataset_mean
-            ) / self.dataset_std
-            self.dataset_target = (
-                self.dataset_target - self.dataset_mean
             ) / self.dataset_std
         else:
             self.test_input = np.concatenate(test_input, axis=0)
@@ -139,10 +129,7 @@ class DataModule_descriptor(pl.LightningDataModule):
 
     def train_dataloader(self):
         batch_size = self.batch_size
-        dataset = TensorDataset(
-            torch.tensor(self.dataset_input, dtype=torch.float32),
-            torch.tensor(self.dataset_target, dtype=torch.float32),
-        )
+        dataset = TensorDataset(torch.tensor(self.dataset_input, dtype=torch.float32))
         dataloader = DataLoader(
             dataset, batch_size=batch_size, shuffle=True, num_workers=8
         )
@@ -159,6 +146,6 @@ class DataModule_descriptor(pl.LightningDataModule):
             torch.tensor(range(len(self.test_filename))),
         )
         dataloader = DataLoader(
-            dataset, batch_size=batch_size, shuffle=True, num_workers=8
+            dataset, batch_size=batch_size, shuffle=False, num_workers=8
         )
         return dataloader
