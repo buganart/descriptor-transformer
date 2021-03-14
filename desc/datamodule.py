@@ -105,7 +105,7 @@ class DataModule_descriptor(pl.LightningDataModule):
                 dataset_input.append(input_array)
             else:
                 # process data for prediction
-                last_descriptors = des_array[np.newaxis, -window_size:, :]
+                last_descriptors = des_array[np.newaxis, :, :]
                 test_input.append(last_descriptors)
                 # also record filename, trim to 20 chars
                 test_filename.append(str(path.stem)[:20])

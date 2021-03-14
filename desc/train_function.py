@@ -15,7 +15,11 @@ import pprint
 import wandb
 
 from desc.datamodule import DataModule_descriptor
-from desc.model import SimpleRNNModel, TransformerEncoderOnlyModel
+from desc.model import (
+    SimpleLSTMModel,
+    LSTMEncoderDecoderModel,
+    TransformerEncoderOnlyModel,
+)
 from desc.helper_function import (
     SaveWandbCallback,
     save_checkpoint_to_cloud,
@@ -25,8 +29,10 @@ from desc.helper_function import (
 
 
 def _get_models(model_name):
-    if model_name == "RNN":
-        MODEL_CLASS = SimpleRNNModel
+    if model_name == "LSTM":
+        MODEL_CLASS = SimpleLSTMModel
+    elif model_name == "LSTMEncoderDecoderModel":
+        MODEL_CLASS = LSTMEncoderDecoderModel
     else:
         MODEL_CLASS = TransformerEncoderOnlyModel
     return MODEL_CLASS
@@ -178,6 +184,7 @@ def main():
         experiment_dir="../",
         resume_run_id="",
         window_size=10,
+        forecast_size=3,
         learning_rate=1e-4,
         batch_size=16,
         epochs=3,
@@ -186,7 +193,7 @@ def main():
         hidden_size=100,
         num_layers=3,
         remove_outliers=True,
-        selected_model="RNN",
+        selected_model="LSTM",
         descriptor_size=5,
         dim_pos_encoding=50,
         nhead=5,
@@ -195,8 +202,12 @@ def main():
         positional_encoding_dropout=0,
         dim_feedforward=128,
     )
+
     config = Namespace(**config_dict)
     config.seed = 1234
+    if config.selected_model != "LSTMEncoderDecoderModel":
+        config.forecast_size = 0
+    config.window_size = config.window_size + config.forecast_size
 
     # run offline
     os.environ["WANDB_MODE"] = "dryrun"
@@ -221,8 +232,11 @@ def main():
     #     datamodule.dataset_mean, datamodule.dataset_std
     # )
     # test_data, filenames = next(iter(test_dataloader))
-    test_dataloader = datamodule.train_dataloader()
+    config.window_size = 15
+    datamodule2 = setup_datamodule(config, run)
+    test_dataloader = datamodule2.train_dataloader()
     test_data = next(iter(test_dataloader))[0]
+    print("test_data.shape", test_data.shape)
     pred = model.predict(test_data, 5)
     print("pred.shape", pred.shape)
     # save_descriptor_as_json(data_location, prediction, audio_info)
