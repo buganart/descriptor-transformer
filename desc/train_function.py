@@ -196,7 +196,7 @@ def main():
         hidden_size=100,
         num_layers=3,
         remove_outliers=True,
-        selected_model="LSTMEncoderDecoderModel",
+        selected_model="LSTM",
         descriptor_size=5,
         dim_pos_encoding=50,
         nhead=5,

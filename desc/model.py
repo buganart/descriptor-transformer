@@ -120,7 +120,6 @@ class LSTMEncoderDecoderModel(pl.LightningModule):
 
         self.pos_encoder = PositionalEncoding(
             dim_pos_encoding,
-            dropout=0,
             dtype=self.linear.weight,
         )
 
@@ -196,12 +195,11 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
         self.config = config
         self.save_hyperparameters("config")
 
+        num_layers = config.num_layers
         descriptor_size = config.descriptor_size
         dim_pos_encoding = config.dim_pos_encoding
         nhead = config.nhead
-        num_encoder_layers = config.num_encoder_layers
         dropout = config.dropout
-        positional_encoding_dropout = config.positional_encoding_dropout
         dim_feedforward = config.dim_feedforward
 
         self.loss_function = nn.MSELoss()
@@ -209,9 +207,8 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
             descriptor_size=descriptor_size,
             dim_pos_encoding=dim_pos_encoding,
             nhead=nhead,
-            num_encoder_layers=num_encoder_layers,
+            num_encoder_layers=num_layers,
             dropout=dropout,
-            positional_encoding_dropout=positional_encoding_dropout,
             dim_feedforward=dim_feedforward,
         )
 
@@ -305,7 +302,6 @@ class TransformerModel(pl.LightningModule):
 
         self.pos_encoder = PositionalEncoding(
             dim_pos_encoding,
-            dropout=0,
             dtype=self.transformer.decoder.layers[0].linear1.weight,
         )
 
@@ -373,7 +369,6 @@ class TransformerEncoderOnly(nn.Module):
         nhead=10,
         num_encoder_layers=1,
         dropout=0.1,
-        positional_encoding_dropout=0,
         dim_feedforward=1024,
     ):
         super().__init__()
@@ -387,7 +382,6 @@ class TransformerEncoderOnly(nn.Module):
 
         self.pos_encoder = PositionalEncoding(
             dim_pos_encoding,
-            dropout=positional_encoding_dropout,
             dtype=self.decoder.weight,
         )
         self.encoder_layer = nn.TransformerEncoderLayer(
@@ -428,12 +422,8 @@ class TransformerEncoderOnly(nn.Module):
 
 # Note that this input order is "SBE"
 class PositionalEncoding(nn.Module):
-    def __init__(
-        self, dim_pos_encoding, dropout=0.1, max_len=5000, dtype=torch.float64
-    ):
+    def __init__(self, dim_pos_encoding, max_len=5000, dtype=torch.float64):
         super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
         pe = torch.zeros(max_len, dim_pos_encoding).type_as(dtype)
         position = torch.arange(0, max_len).type_as(dtype).unsqueeze(1)
         div_term = torch.exp(
@@ -450,7 +440,6 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         seq_len, batch_size, _ = x.shape
         pe = self.pe[:seq_len, :].expand(-1, batch_size, -1)
-        pe = self.dropout(pe)
         return torch.cat((x, pe), 2)
 
     def generate_encoding(self, batch_size, seq_len):
