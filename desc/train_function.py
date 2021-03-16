@@ -19,6 +19,7 @@ from desc.model import (
     SimpleLSTMModel,
     LSTMEncoderDecoderModel,
     TransformerEncoderOnlyModel,
+    TransformerModel,
 )
 from desc.helper_function import (
     SaveWandbCallback,
@@ -33,8 +34,10 @@ def _get_models(model_name):
         MODEL_CLASS = SimpleLSTMModel
     elif model_name == "LSTMEncoderDecoderModel":
         MODEL_CLASS = LSTMEncoderDecoderModel
-    else:
+    elif model_name == "TransformerEncoderOnlyModel":
         MODEL_CLASS = TransformerEncoderOnlyModel
+    else:
+        MODEL_CLASS = TransformerModel
     return MODEL_CLASS
 
 
@@ -193,7 +196,7 @@ def main():
         hidden_size=100,
         num_layers=3,
         remove_outliers=True,
-        selected_model="LSTM",
+        selected_model="LSTMEncoderDecoderModel",
         descriptor_size=5,
         dim_pos_encoding=50,
         nhead=5,
@@ -205,7 +208,7 @@ def main():
 
     config = Namespace(**config_dict)
     config.seed = 1234
-    if config.selected_model != "LSTMEncoderDecoderModel":
+    if config.selected_model not in ["LSTMEncoderDecoderModel", "TransformerModel"]:
         config.forecast_size = 0
     config.window_size = config.window_size + config.forecast_size
 

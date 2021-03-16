@@ -99,15 +99,30 @@ class LSTMEncoderDecoderModel(pl.LightningModule):
         descriptor_size = config.descriptor_size
         hidden_size = config.hidden_size
         num_layers = config.num_layers
+        dim_pos_encoding = config.dim_pos_encoding
+        if dim_pos_encoding < 0:
+            dim_pos_encoding = 0
+        self.dim_pos_encoding = dim_pos_encoding
 
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
         self.encoder = nn.LSTM(
-            descriptor_size, hidden_size, num_layers=num_layers, batch_first=True
+            descriptor_size + dim_pos_encoding,
+            hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
         )
-        self.decoder = nn.LSTM(1, hidden_size, num_layers=num_layers, batch_first=True)
+        self.decoder = nn.LSTM(
+            1 + dim_pos_encoding, hidden_size, num_layers=num_layers, batch_first=True
+        )
         self.linear = nn.Linear(hidden_size, descriptor_size)
+
+        self.pos_encoder = PositionalEncoding(
+            dim_pos_encoding,
+            dropout=0,
+            dtype=self.linear.weight,
+        )
 
         self.loss_function = nn.MSELoss()
 
@@ -122,8 +137,10 @@ class LSTMEncoderDecoderModel(pl.LightningModule):
         wandb.log(log_dict)
         self.model_ep_loss_list = []
 
-    def encode(self, x):
+    def encode(self, x, pos_code=None):
         batch_size = x.shape[0]
+        if pos_code is not None:
+            x = torch.cat((x, pos_code), 2)
         h = (
             torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
             torch.zeros(self.num_layers, batch_size, self.hidden_size).type_as(x),
@@ -131,9 +148,11 @@ class LSTMEncoderDecoderModel(pl.LightningModule):
         _, hidden = self.encoder(x, h)
         return hidden
 
-    def decode(self, h, step):
+    def decode(self, h, step, pos_code=None):
         batch_size = h[0].shape[1]
         x = torch.zeros(batch_size, step, 1).type_as(h[0])
+        if pos_code is not None:
+            x = torch.cat((x, pos_code), 2)
         out, h_new = self.decoder(x, h)
         out = out.reshape((batch_size * step, -1))
         out = self.linear(out)
@@ -141,8 +160,15 @@ class LSTMEncoderDecoderModel(pl.LightningModule):
         return out, h_new
 
     def forward(self, x, step):
-        hidden = self.encode(x)
-        out, _ = self.decode(hidden, step)
+        batch_size, seq_len, d_size = x.shape
+        if self.dim_pos_encoding > 0:
+            pos_code = self.pos_encoder.generate_encoding(
+                batch_size, seq_len + step
+            ).type_as(x)
+            pos_code = torch.einsum("sbe->bse", pos_code)
+
+        hidden = self.encode(x, pos_code[:, :seq_len])
+        out, _ = self.decode(hidden, step, pos_code[:, seq_len:])
         return out
 
     def training_step(self, batch, batch_idx):
@@ -246,6 +272,94 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
         return all_descriptors.detach().cpu().numpy()[:, -step:, :]
 
 
+class TransformerModel(pl.LightningModule):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.save_hyperparameters("config")
+        descriptor_size = config.descriptor_size
+        hidden_size = config.hidden_size
+        num_layers = config.num_layers
+
+        nhead = config.nhead
+        dim_pos_encoding = config.dim_pos_encoding
+        if dim_pos_encoding < 0:
+            dim_pos_encoding = 0
+        dim_feedforward = config.dim_feedforward
+        dropout = config.dropout
+
+        d_model = descriptor_size + dim_pos_encoding
+
+        self.dim_pos_encoding = dim_pos_encoding
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        self.transformer = nn.Transformer(
+            d_model=d_model,
+            nhead=nhead,
+            num_encoder_layers=num_layers,
+            num_decoder_layers=num_layers,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+        )
+
+        self.pos_encoder = PositionalEncoding(
+            dim_pos_encoding,
+            dropout=0,
+            dtype=self.transformer.decoder.layers[0].linear1.weight,
+        )
+
+        self.loss_function = nn.MSELoss()
+        self.model_ep_loss_list = []
+
+    def on_train_epoch_end(self, epoch_output):
+        log_dict = {"epoch": self.current_epoch}
+
+        loss = np.mean(self.model_ep_loss_list)
+        log_dict["loss"] = loss
+
+        wandb.log(log_dict)
+        self.model_ep_loss_list = []
+
+    def forward(self, x, step):
+        batch_size, seq_len, d_size = x.shape
+        x = torch.einsum("bse->sbe", x)
+        tgt_input = torch.zeros((step, batch_size, d_size)).type_as(x)
+        # the pos_code is in SBE
+        if self.dim_pos_encoding > 0:
+            pos_code = self.pos_encoder.generate_encoding(
+                batch_size, seq_len + step
+            ).type_as(x)
+            x = torch.cat((x, pos_code[:seq_len]), 2)
+            tgt_input = torch.cat((tgt_input, pos_code[seq_len:]), 2)
+
+        src_mask = self.transformer.generate_square_subsequent_mask(seq_len).type_as(x)
+        out = self.transformer(x, tgt_input, src_mask=src_mask)
+
+        # remove pos_code in output
+        out = out[:, :, :d_size]
+        out = torch.einsum("sbe->bse", out)
+        return out
+
+    def training_step(self, batch, batch_idx):
+        data = batch[0]
+        forecast_size = self.config.forecast_size
+        data, target = data[:, :-forecast_size, :], data[:, -forecast_size:, :]
+        pred = self(data, forecast_size)
+
+        loss = self.loss_function(pred, target)
+
+        self.model_ep_loss_list.append(loss.detach().cpu().numpy())
+        return loss
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
+
+    def predict(self, data, step):
+        out = self(data, step)
+        return out.detach().cpu().numpy()
+
+
 ########################
 #   components
 ########################
@@ -338,3 +452,7 @@ class PositionalEncoding(nn.Module):
         pe = self.pe[:seq_len, :].expand(-1, batch_size, -1)
         pe = self.dropout(pe)
         return torch.cat((x, pe), 2)
+
+    def generate_encoding(self, batch_size, seq_len):
+        pe = self.pe[:seq_len, :].expand(-1, batch_size, -1)
+        return pe
