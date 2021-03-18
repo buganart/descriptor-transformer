@@ -117,8 +117,12 @@ class DataModule_descriptor(pl.LightningDataModule):
             self.dataset_mean = all_desc.mean(axis=0)
             self.dataset_std = all_desc.std(axis=0)
             # data input in shape (NUM_BATCH, WINDOW_SIZE, NUM_FEAT)
-            self.dataset_input = np.concatenate(dataset_input, axis=0)
-            print("dataset shape:", self.dataset_input.shape)
+            dataset = np.concatenate(dataset_input, axis=0)
+            num_data_train = int(dataset.shape[0] * 0.9)
+            self.dataset_input = dataset[:num_data_train]
+            self.dataset_val = dataset[num_data_train:]
+            print("train dataset shape:", self.dataset_input.shape)
+            print("val dataset shape:", self.dataset_input.shape)
             # normalize data
             self.dataset_input = (
                 self.dataset_input - self.dataset_mean
@@ -130,6 +134,14 @@ class DataModule_descriptor(pl.LightningDataModule):
     def train_dataloader(self):
         batch_size = self.batch_size
         dataset = TensorDataset(torch.tensor(self.dataset_input, dtype=torch.float32))
+        dataloader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=True, num_workers=8
+        )
+        return dataloader
+
+    def val_dataloader(self):
+        batch_size = self.batch_size
+        dataset = TensorDataset(torch.tensor(self.dataset_val, dtype=torch.float32))
         dataloader = DataLoader(
             dataset, batch_size=batch_size, shuffle=True, num_workers=8
         )

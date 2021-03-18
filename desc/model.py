@@ -36,8 +36,14 @@ class SimpleLSTMModel(pl.LightningModule):
         loss = np.mean(self.model_ep_loss_list)
         log_dict["loss"] = loss
 
-        wandb.log(log_dict)
+        wandb.log(log_dict, step=self.current_epoch)
         self.model_ep_loss_list = []
+
+    def validation_epoch_end(self, validation_step_outputs):
+        outputs = []
+        for pred in validation_step_outputs:
+            outputs.append(pred.detach().cpu().numpy())
+        wandb.log({"val_loss": np.mean(outputs)}, step=self.current_epoch)
 
     def forward(self, x, hidden=None):
         batch_size, seq_len, d_size = x.shape
@@ -65,6 +71,15 @@ class SimpleLSTMModel(pl.LightningModule):
         loss = self.loss_function(pred, target)
 
         self.model_ep_loss_list.append(loss.detach().cpu().numpy())
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        data = batch[0]
+        data, target = data[:, :-1, :], data[:, 1:, :]
+        pred = self(data)
+
+        loss = self.loss_function(pred, target)
+
         return loss
 
     def configure_optimizers(self):
@@ -133,8 +148,14 @@ class LSTMEncoderDecoderModel(pl.LightningModule):
         loss = np.mean(self.model_ep_loss_list)
         log_dict["loss"] = loss
 
-        wandb.log(log_dict)
+        wandb.log(log_dict, step=self.current_epoch)
         self.model_ep_loss_list = []
+
+    def validation_epoch_end(self, validation_step_outputs):
+        outputs = []
+        for pred in validation_step_outputs:
+            outputs.append(pred.detach().cpu().numpy())
+        wandb.log({"val_loss": np.mean(outputs)}, step=self.current_epoch)
 
     def encode(self, x, pos_code=None):
         batch_size = x.shape[0]
@@ -181,6 +202,15 @@ class LSTMEncoderDecoderModel(pl.LightningModule):
         self.model_ep_loss_list.append(loss.detach().cpu().numpy())
         return loss
 
+    def validation_step(self, batch, batch_idx):
+        data = batch[0]
+        forecast_size = self.config.forecast_size
+        data, target = data[:, :-forecast_size, :], data[:, -forecast_size:, :]
+        pred = self(data, forecast_size)
+
+        loss = self.loss_function(pred, target)
+        return loss
+
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.config.learning_rate)
 
@@ -220,8 +250,14 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
         loss = np.mean(self.model_ep_loss_list)
         log_dict["loss"] = loss
 
-        wandb.log(log_dict)
+        wandb.log(log_dict, step=self.current_epoch)
         self.model_ep_loss_list = []
+
+    def validation_epoch_end(self, validation_step_outputs):
+        outputs = []
+        for pred in validation_step_outputs:
+            outputs.append(pred.detach().cpu().numpy())
+        wandb.log({"val_loss": np.mean(outputs)}, step=self.current_epoch)
 
     def forward(self, src, src_mask):
         output = self.model(src, src_mask)
@@ -245,6 +281,20 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
         loss = self.loss_function(output, target)
 
         self.model_ep_loss_list.append(loss.detach().cpu().numpy())
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        data = batch[0]
+        data, target = data[:, :-1, :], data[:, 1:, :]
+        # Note that data shape (BSE)
+        src_mask = self.generate_square_subsequent_mask(data.size(1)).type_as(data)
+
+        output = self.model(
+            data,
+            src_mask=src_mask,
+        )
+
+        loss = self.loss_function(output, target)
         return loss
 
     def configure_optimizers(self):
@@ -314,8 +364,14 @@ class TransformerModel(pl.LightningModule):
         loss = np.mean(self.model_ep_loss_list)
         log_dict["loss"] = loss
 
-        wandb.log(log_dict)
+        wandb.log(log_dict, step=self.current_epoch)
         self.model_ep_loss_list = []
+
+    def validation_epoch_end(self, validation_step_outputs):
+        outputs = []
+        for pred in validation_step_outputs:
+            outputs.append(pred.detach().cpu().numpy())
+        wandb.log({"val_loss": np.mean(outputs)}, step=self.current_epoch)
 
     def forward(self, x, step):
         batch_size, seq_len, d_size = x.shape
@@ -346,6 +402,15 @@ class TransformerModel(pl.LightningModule):
         loss = self.loss_function(pred, target)
 
         self.model_ep_loss_list.append(loss.detach().cpu().numpy())
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        data = batch[0]
+        forecast_size = self.config.forecast_size
+        data, target = data[:, :-forecast_size, :], data[:, -forecast_size:, :]
+        pred = self(data, forecast_size)
+
+        loss = self.loss_function(pred, target)
         return loss
 
     def configure_optimizers(self):
