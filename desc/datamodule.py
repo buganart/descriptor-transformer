@@ -3,19 +3,21 @@ import tqdm
 from pathlib import Path
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torch.nn as nn
 import pytorch_lightning as pl
 
 
 class DataModule_descriptor(pl.LightningDataModule):
-    def __init__(self, config, isTrain=True):
+    def __init__(self, config, isTrain=True, process_on_the_fly=True):
         super().__init__()
         self.data_path = Path(config.audio_db_dir)
         self.isTrain = isTrain
+        self.process_on_the_fly = process_on_the_fly
+        self.remove_outliers = config.remove_outliers
+
         self.window_size = config.window_size
         self.batch_size = config.batch_size
-        self.remove_outliers = config.remove_outliers
 
         self.dataset_input = None
         self.dataset_target = None
@@ -106,6 +108,8 @@ class DataModule_descriptor(pl.LightningDataModule):
             if num_des <= window_size + 1:
                 continue
             if self.isTrain:
+                if self.process_on_the_fly:
+                    continue
                 # process as train data
                 input_array = self._descriptor_batchify(des_array, window_size)
                 # add processed array to dataset
@@ -123,37 +127,61 @@ class DataModule_descriptor(pl.LightningDataModule):
         if self.isTrain:
             # calculate mean and std
             # all_desc in shape (NUM_DESC, NUM_FEAT)
-            all_desc = np.concatenate(all_desc, axis=0)
-            self.dataset_mean = all_desc.mean(axis=0)
-            self.dataset_std = all_desc.std(axis=0)
-            # data input in shape (NUM_BATCH, WINDOW_SIZE, NUM_FEAT)
-            dataset = np.concatenate(dataset_input, axis=0)
-            num_data_train = int(dataset.shape[0] * 0.9)
-            self.dataset_input = dataset[:num_data_train]
-            self.dataset_val = dataset[num_data_train:]
-            print("train dataset shape:", self.dataset_input.shape)
-            print("val dataset shape:", self.dataset_val.shape)
-            # normalize data
-            self.dataset_input = (
-                self.dataset_input - self.dataset_mean
-            ) / self.dataset_std
+            all_descriptors = np.concatenate(all_desc, axis=0)
+            self.dataset_mean = all_descriptors.mean(axis=0)
+            self.dataset_std = all_descriptors.std(axis=0)
+
+            if self.process_on_the_fly:
+                # normalize data
+                all_desc = [
+                    (d - self.dataset_mean) / self.dataset_std for d in all_desc
+                ]
+                num_data_train = int(len(all_desc) * 0.9)
+                self.dataset_input = all_desc[:num_data_train]
+                self.dataset_val = all_desc[num_data_train:]
+                print(
+                    "train dataset shape (before process_on_the_fly):",
+                    len(self.dataset_input),
+                )
+                print(
+                    "val dataset shape (before process_on_the_fly):",
+                    len(self.dataset_val),
+                )
+            else:
+                # data input in shape (NUM_BATCH, WINDOW_SIZE, NUM_FEAT)
+                dataset = np.concatenate(dataset_input, axis=0)
+                # normalize data
+                dataset = (dataset - self.dataset_mean) / self.dataset_std
+                num_data_train = int(dataset.shape[0] * 0.9)
+                self.dataset_input = dataset[:num_data_train]
+                self.dataset_val = dataset[num_data_train:]
+                print("train dataset shape:", self.dataset_input.shape)
+                print("val dataset shape:", self.dataset_val.shape)
         else:
             self.test_input = np.concatenate(test_input, axis=0)
             self.test_filename = test_filename
 
     def train_dataloader(self):
         batch_size = self.batch_size
-        dataset = TensorDataset(torch.tensor(self.dataset_input, dtype=torch.float32))
+        if self.process_on_the_fly:
+            dataset = RealTimeProcessDataset(self.dataset_input, self.window_size)
+        else:
+            dataset = TensorDataset(
+                torch.tensor(self.dataset_input, dtype=torch.float32)
+            )
         dataloader = DataLoader(
-            dataset, batch_size=batch_size, shuffle=True, num_workers=8
+            dataset, batch_size=batch_size, shuffle=True, num_workers=4
         )
         return dataloader
 
     def val_dataloader(self):
         batch_size = self.batch_size
-        dataset = TensorDataset(torch.tensor(self.dataset_val, dtype=torch.float32))
+        if self.process_on_the_fly:
+            dataset = RealTimeProcessDataset(self.dataset_input, self.window_size)
+        else:
+            dataset = TensorDataset(torch.tensor(self.dataset_val, dtype=torch.float32))
         dataloader = DataLoader(
-            dataset, batch_size=batch_size, shuffle=True, num_workers=8
+            dataset, batch_size=batch_size, shuffle=True, num_workers=4
         )
         return dataloader
 
@@ -168,6 +196,37 @@ class DataModule_descriptor(pl.LightningDataModule):
             torch.tensor(range(len(self.test_filename))),
         )
         dataloader = DataLoader(
-            dataset, batch_size=batch_size, shuffle=False, num_workers=8
+            dataset, batch_size=batch_size, shuffle=False, num_workers=4
         )
         return dataloader
+
+
+#####
+#   helper class
+#####
+
+
+class RealTimeProcessDataset(Dataset):
+    def __init__(self, data_list, window_size, dtype=torch.float32):
+        assert isinstance(data_list, list)
+        self.data_list = data_list
+        self.size = 1024
+        self.window_size = window_size
+        self.dtype = dtype
+
+    def __getitem__(self, index):
+        # index information is ignored
+        sample_index = np.random.randint(0, len(self.data_list))
+
+        sample = self.data_list[sample_index]
+        sample_length = len(sample)
+        window_index = np.random.randint(0, sample_length - self.window_size)
+        item = sample[window_index : window_index + self.window_size]
+
+        return torch.tensor(np.array(item)[np.newaxis, :, :], dtype=self.dtype)
+
+    def __len__(self):
+        return self.size
+
+    def __add__(self, other):
+        return RealTimeProcessDataset(self.data_list.append(other), self.window_size)

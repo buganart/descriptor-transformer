@@ -87,11 +87,11 @@ def init_wandb_run(config, run_dir="./", mode="run"):
     return run
 
 
-def setup_datamodule(config, run, isTrain=True):
+def setup_datamodule(config, run, isTrain=True, process_on_the_fly=True):
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
 
-    dataModule = DataModule_descriptor(config, isTrain)
+    dataModule = DataModule_descriptor(config, isTrain, process_on_the_fly)
     dataModule.setup()
     if isTrain:
         # save mean std to npz
@@ -216,7 +216,7 @@ def main():
     os.environ["WANDB_MODE"] = "dryrun"
 
     run = init_wandb_run(config, run_dir=config.experiment_dir, mode="offline")
-    datamodule = setup_datamodule(config, run)
+    datamodule = setup_datamodule(config, run, isTrain=True, process_on_the_fly=False)
     model, extra_trainer_args = setup_model(config, run)
     train(config, run, model, datamodule, extra_trainer_args)
 
