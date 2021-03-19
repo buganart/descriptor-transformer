@@ -210,7 +210,7 @@ class RealTimeProcessDataset(Dataset):
     def __init__(self, data_list, window_size, dtype=torch.float32):
         assert isinstance(data_list, list)
         self.data_list = data_list
-        self.size = 1024
+        self.size = 64 * 1024
         self.window_size = window_size
         self.dtype = dtype
 
