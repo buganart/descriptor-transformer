@@ -102,7 +102,7 @@ class DataModule_descriptor(pl.LightningDataModule):
                 # record all descriptor for statistics
             all_desc.append(des_array)
             num_des = des_array.shape[0]
-            print(f"{str(path.stem)[:20]} file number of descriptors:", num_des)
+            # print(f"{str(path.stem)[:20]} file number of descriptors:", num_des)
             if num_des <= window_size + 1:
                 continue
             if self.isTrain:
@@ -132,7 +132,7 @@ class DataModule_descriptor(pl.LightningDataModule):
             self.dataset_input = dataset[:num_data_train]
             self.dataset_val = dataset[num_data_train:]
             print("train dataset shape:", self.dataset_input.shape)
-            print("val dataset shape:", self.dataset_input.shape)
+            print("val dataset shape:", self.dataset_val.shape)
             # normalize data
             self.dataset_input = (
                 self.dataset_input - self.dataset_mean
