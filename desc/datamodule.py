@@ -59,12 +59,13 @@ class DataModule_descriptor(pl.LightningDataModule):
             # convert data into descriptor array
             des_array = [j for (i, j) in sorted_data]
             des_array = np.array(des_array)
+            if des_array.shape[0] == 0:
+                return des_array, None, None
 
             # calculate interval and record last timestamp
             last_timestamp = sorted_data[-1][0]
-            self.last_timestamp.append(last_timestamp)
-            self.interval = sorted_data[-1][0] - sorted_data[-2][0]
-        return des_array
+            interval = sorted_data[-1][0] - sorted_data[-2][0]
+        return des_array, last_timestamp, interval
 
     def _descriptor_batchify(self, des_array, window_size):
         # pack descriptors into batches based on window_size
@@ -92,14 +93,14 @@ class DataModule_descriptor(pl.LightningDataModule):
 
         # process files in the filepath_list
         for path in tqdm.tqdm(filepath_list, desc="Descriptor Files"):
-            des_array = self._load_descriptor_list(path)
+            des_array, last_timestamp, interval = self._load_descriptor_list(path)
             # remove outliers
             if self.remove_outliers:
                 des_array = self._remove_outliers_fn(des_array)
                 # record all descriptor for statistics
             all_desc.append(des_array)
             num_des = des_array.shape[0]
-            # print("num_des",num_des)
+            print(f"{str(path.stem)[:20]} file number of descriptors:", num_des)
             if num_des <= window_size + 1:
                 continue
             if self.isTrain:
@@ -113,6 +114,9 @@ class DataModule_descriptor(pl.LightningDataModule):
                 test_input.append(last_descriptors)
                 # also record filename, trim to 20 chars
                 test_filename.append(str(path.stem)[:20])
+                # save metadata
+                self.last_timestamp.append(last_timestamp)
+                self.interval = interval
 
         if self.isTrain:
             # calculate mean and std
