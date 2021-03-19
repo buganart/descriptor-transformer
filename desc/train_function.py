@@ -181,7 +181,7 @@ def train(config, run, model, dataModule, extra_trainer_args):
 
 # sample script
 def main():
-    data_location = "../tests/"
+    data_location = "../tests/samples_large"
     config_dict = dict(
         audio_db_dir=data_location,
         experiment_dir="../",

@@ -46,7 +46,9 @@ class DataModule_descriptor(pl.LightningDataModule):
                 timestamp = next(iter(des))
                 descriptor = des[timestamp]
                 if len(self.attribute_list) == 0:
-                    self.attribute_list = descriptor.keys()
+                    self.attribute_list = list(descriptor.keys())
+                    self.attribute_list.remove("id")
+                    self.attribute_list.remove("sample")
                     self.attribute_list = sorted(self.attribute_list)
                 values = []
                 for k in self.attribute_list:
@@ -77,7 +79,9 @@ class DataModule_descriptor(pl.LightningDataModule):
         window_size = self.window_size
         filepath_list = self.data_path.rglob("*.*")
         # check files in filepath_list is supported (by extensions)
-        filepath_list = [path for path in filepath_list if Path(path).suffix == ".txt"]
+        filepath_list = [
+            path for path in filepath_list if Path(path).suffix in [".json", ".txt"]
+        ]
 
         all_desc = []
 
@@ -95,7 +99,7 @@ class DataModule_descriptor(pl.LightningDataModule):
                 # record all descriptor for statistics
             all_desc.append(des_array)
             num_des = des_array.shape[0]
-
+            # print("num_des",num_des)
             if num_des <= window_size + 1:
                 continue
             if self.isTrain:
