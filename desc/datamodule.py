@@ -49,8 +49,10 @@ class DataModule_descriptor(pl.LightningDataModule):
                 descriptor = des[timestamp]
                 if len(self.attribute_list) == 0:
                     self.attribute_list = list(descriptor.keys())
-                    self.attribute_list.remove("id")
-                    self.attribute_list.remove("sample")
+                    if "id" in self.attribute_list:
+                        self.attribute_list.remove("id")
+                    if "sample" in self.attribute_list:
+                        self.attribute_list.remove("sample")
                     self.attribute_list = sorted(self.attribute_list)
                 values = []
                 for k in self.attribute_list:
