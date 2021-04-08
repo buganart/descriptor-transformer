@@ -181,7 +181,8 @@ def train(config, run, model, dataModule, extra_trainer_args):
 
 # sample script
 def main():
-    data_location = "../tests/samples_large"
+    # data_location = "../tests/samples_large"
+    data_location = "../../music_sample/TESTING"
     config_dict = dict(
         audio_db_dir=data_location,
         experiment_dir="../",
@@ -190,7 +191,7 @@ def main():
         forecast_size=3,
         learning_rate=1e-4,
         batch_size=16,
-        epochs=3,
+        epochs=1,
         save_interval=2,
         notes="",
         hidden_size=100,
@@ -229,20 +230,18 @@ def main():
     # model, _ = setup_model(config, run)
     model.eval()
     # # construct test_data
-
-    # testdatamodule = setup_datamodule(config, run, isTrain=False)
-    # test_dataloader = testdatamodule.test_dataloader(
-    #     datamodule.dataset_mean, datamodule.dataset_std
-    # )
-    # test_data, filenames = next(iter(test_dataloader))
     config.window_size = 15
-    datamodule2 = setup_datamodule(config, run)
-    test_dataloader = datamodule2.train_dataloader()
-    test_data = next(iter(test_dataloader))[0]
+    datamodule2 = DataModule_descriptor(config, isTrain=False)
+    datamodule2.setup()
+    datamodule2.dataset_mean = datamodule.dataset_mean
+    datamodule2.dataset_std = datamodule.dataset_std
+
+    test_dataloader = datamodule2.test_dataloader()
+    test_data, fileindex = next(iter(test_dataloader))
     print("test_data.shape", test_data.shape)
     pred = model.predict(test_data, 5)
     print("pred.shape", pred.shape)
-    # save_descriptor_as_json(data_location, prediction, audio_info)
+    save_descriptor_as_json(data_location, pred, fileindex, datamodule2)
 
 
 if __name__ == "__main__":

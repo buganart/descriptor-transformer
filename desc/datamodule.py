@@ -2,15 +2,19 @@ import json
 import tqdm
 from pathlib import Path
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torch.nn as nn
 import pytorch_lightning as pl
 
+from desc.helper_function import wav2descriptor, save_json, get_dataframe_from_json
+
 
 class DataModule_descriptor(pl.LightningDataModule):
     def __init__(self, config, isTrain=True, process_on_the_fly=True):
         super().__init__()
+        self.config = config
         self.data_path = Path(config.audio_db_dir)
         self.isTrain = isTrain
         self.process_on_the_fly = process_on_the_fly
@@ -29,47 +33,56 @@ class DataModule_descriptor(pl.LightningDataModule):
         #
         self.test_input = None
         self.test_filename = None
-        self.interval = -1
-        self.last_timestamp = []
 
     def _remove_outliers_fn(self, x):
         mean = x.mean(axis=0)
         std = x.std(axis=0)
         return np.array(x[(np.abs(x - mean) < std * 5).all(axis=1), :])
 
-    # def prepare_data(self):
-    #     pass
+    def prepare_data(self):
+        # find .wav files
+        wav_list = self.data_path.rglob("*.wav")
+        print("list of wav files:", wav_list)
+        descriptor_list = [
+            path.stem
+            for path in self.data_path.rglob("*.*")
+            if Path(path).suffix in [".json", ".txt"]
+        ]
+        if hasattr(self.config, "hop_length"):
+            hop_length = self.config.hop_length
+        else:
+            hop_length = 1024
+
+        if hasattr(self.config, "sr"):
+            sr = self.config.sr
+        else:
+            sr = 44100
+
+        for wav_path in wav_list:
+            if wav_path.stem not in descriptor_list:
+                descriptors = wav2descriptor(wav_path, hop=hop_length, sr=sr)
+                savefile = (
+                    wav_path.parent
+                    / "processed_descriptors"
+                    / (str(wav_path.stem) + ".json")
+                )
+                save_json(savefile, descriptors)
 
     def _load_descriptor_list(self, path):
-        with open(path) as json_file:
-            data = json.load(json_file)
-            data_list = []
-            for des in data:
-                timestamp = next(iter(des))
-                descriptor = des[timestamp]
-                if len(self.attribute_list) == 0:
-                    self.attribute_list = list(descriptor.keys())
-                    if "id" in self.attribute_list:
-                        self.attribute_list.remove("id")
-                    if "sample" in self.attribute_list:
-                        self.attribute_list.remove("sample")
-                    self.attribute_list = sorted(self.attribute_list)
-                values = []
-                for k in self.attribute_list:
-                    values.append(float(descriptor[k]))
-                data_list.append((int(timestamp), values))
-            # sort value by timestamp
-            sorted_data = sorted(data_list)
-            # convert data into descriptor array
-            des_array = [j for (i, j) in sorted_data]
-            des_array = np.array(des_array)
-            if des_array.shape[0] == 0:
-                return None, None, None
-
-            # calculate interval and record last timestamp
-            last_timestamp = sorted_data[-1][0]
-            interval = sorted_data[-1][0] - sorted_data[-2][0]
-        return des_array, last_timestamp, interval
+        df = get_dataframe_from_json(path)
+        if len(self.attribute_list) == 0:
+            columns = df.columns.tolist()
+            # remove unnecessary columns
+            for c in columns:
+                if "_" not in c:
+                    self.attribute_list.append(c)
+            self.attribute_list = sorted(self.attribute_list)
+        # remove unnecessary columns from dataframe
+        df = df.loc[:, self.attribute_list]
+        des_array = df.to_numpy(dtype=np.float32)
+        if des_array.shape[0] == 0:
+            return None
+        return des_array
 
     def _descriptor_batchify(self, des_array, window_size):
         # pack descriptors into batches based on window_size
@@ -81,6 +94,7 @@ class DataModule_descriptor(pl.LightningDataModule):
         return input_array
 
     def setup(self, stage=None):
+        self.prepare_data()
         window_size = self.window_size
         filepath_list = self.data_path.rglob("*.*")
         # check files in filepath_list is supported (by extensions)
@@ -97,7 +111,7 @@ class DataModule_descriptor(pl.LightningDataModule):
 
         # process files in the filepath_list
         for path in tqdm.tqdm(filepath_list, desc="Descriptor Files"):
-            des_array, last_timestamp, interval = self._load_descriptor_list(path)
+            des_array = self._load_descriptor_list(path)
             if des_array is None:
                 continue
             # remove outliers
@@ -118,13 +132,14 @@ class DataModule_descriptor(pl.LightningDataModule):
                 dataset_input.append(input_array)
             else:
                 # process data for prediction
-                last_descriptors = des_array[np.newaxis, :window_size, :]
+                if hasattr(self.config, "forecast_size"):
+                    pred_window_size = self.window_size - self.config.forecast_size
+                else:
+                    pred_window_size = self.window_size
+                last_descriptors = des_array[np.newaxis, -pred_window_size:, :]
                 test_input.append(last_descriptors)
-                # also record filename, trim to 20 chars
-                test_filename.append(str(path.stem)[:20])
-                # save metadata
-                self.last_timestamp.append(last_timestamp)
-                self.interval = interval
+                # also record filename, trim to 30 chars
+                test_filename.append(str(path.stem)[:30])
 
         if self.isTrain:
             # calculate mean and std
