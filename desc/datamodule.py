@@ -42,7 +42,6 @@ class DataModule_descriptor(pl.LightningDataModule):
     def prepare_data(self):
         # find .wav files
         wav_list = self.data_path.rglob("*.wav")
-        print("list of wav files:", wav_list)
         descriptor_list = [
             path.stem
             for path in self.data_path.rglob("*.*")

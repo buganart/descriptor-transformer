@@ -39,6 +39,7 @@ def load_checkpoint_from_cloud(checkpoint_path="model_dict.pth"):
 ####
 # for prediction script
 def wav2descriptor(filename, hop=1024, sr=44100):
+    filename = Path(filename)
     descriptors = []
     y, sr = librosa.load(filename, sr=sr)
     cent = np.ndarray.flatten(
@@ -50,20 +51,25 @@ def wav2descriptor(filename, hop=1024, sr=44100):
     )
     rms = np.ndarray.flatten(librosa.feature.rms(y=y, hop_length=hop))
     f0 = np.ndarray.flatten(librosa.yin(y, 80, 10000, hop_length=hop))
-    id = filename
 
-    for x in range(cent.size):
-        descriptors.append(
-            {
-                "cent": str(cent[x]),
-                "flat": str(flat[x]),
-                "rolloff": str(rolloff[x]),
-                "rms": str(rms[x]),
-                "f0": str(f0[x]),
-                "_id": str(filename),
-                "_sample": str(x * hop),
-            }
-        )
+    num_descriptors = cent.shape[0]
+
+    id = [str(filename)] * num_descriptors
+    sample = np.arange(num_descriptors) * hop
+
+    descriptors = {
+        "cent": cent.tolist(),
+        "flat": flat.tolist(),
+        "rolloff": rolloff.tolist(),
+        "rms": rms.tolist(),
+        "f0": f0.tolist(),
+        "_id": id,
+        "_sample": sample.tolist(),
+    }
+
+    for i in descriptors:
+        print(len(descriptors[i]))
+
     return descriptors
 
 
@@ -107,12 +113,10 @@ def save_descriptor_as_json(save_path, data, dataindex, datamodule, resume_run_i
     for i in range(num_data):
         data_index = dataindex[i]
         # for each data, save 1 json file
-        stored = []
-        for j in range(prediction_length):
-            descriptor_values = {}
-            for k in range(len(attribute_list)):
-                descriptor_values[str(attribute_list[k])] = str(data[i, j, k])
-            stored.append(descriptor_values)
+        descriptors_value = {}
+        for k in range(len(attribute_list)):
+            attribute_name = str(attribute_list[k])
+            descriptors_value[attribute_name] = data[i, :, k].tolist()
 
         # save to json
         # find data source name
@@ -122,4 +126,4 @@ def save_descriptor_as_json(save_path, data, dataindex, datamodule, resume_run_i
         if resume_run_id:
             filename = str(resume_run_id) + "_" + filename
         json_path = save_path / filename
-        save_json(json_path, stored)
+        save_json(json_path, descriptors_value)
