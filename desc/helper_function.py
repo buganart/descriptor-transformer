@@ -73,7 +73,7 @@ def dir2descriptor(directory, hop=1024, sr=44100):
     for filename in directory.rglob("*.wav"):
         print("processing:", filename)
         descriptors = wav2descriptor(filename, hop=hop, sr=sr)
-        data.append((filename, descriptors))
+        data.append((str(filename), descriptors))
     return data
 
 
