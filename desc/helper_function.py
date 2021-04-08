@@ -67,9 +67,6 @@ def wav2descriptor(filename, hop=1024, sr=44100):
         "_sample": sample.tolist(),
     }
 
-    for i in descriptors:
-        print(len(descriptors[i]))
-
     return descriptors
 
 
