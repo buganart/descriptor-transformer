@@ -4,6 +4,7 @@ import torch
 import json
 from pathlib import Path
 import librosa
+import shutil
 
 
 from pytorch_lightning.callbacks.base import Callback
@@ -70,12 +71,56 @@ def wav2descriptor(filename, hop=1024, sr=44100):
     return descriptors
 
 
+def process_descriptors(data_path, hop_length, sr):
+    # find .wav files
+    data_path = Path(data_path)
+    wav_list = data_path.rglob("*.wav")
+
+    descriptor_list = [
+        path.stem
+        for path in data_path.rglob("*.*")
+        if Path(path).suffix in [".json", ".txt"]
+    ]
+
+    processed_data_path = data_path / "processed_descriptors"
+    processed_data_path.mkdir(parents=True, exist_ok=True)
+
+    # process wav not being processed (not in descriptor_list) to processed_data_path
+    for wav_path in wav_list:
+        if wav_path.stem not in descriptor_list:
+            descriptors = wav2descriptor(wav_path, hop=hop_length, sr=sr)
+            num_descriptors = len(descriptors["cent"])
+            print(f"processed {wav_path}. number of descriptors: {num_descriptors}")
+            savefile = processed_data_path / (str(wav_path.stem) + ".json")
+            save_json(savefile, descriptors)
+
+    # copy processed descriptors (those in descriptor_list) to processed_data_path
+    descriptor_list = [
+        path
+        for path in data_path.rglob("*.*")
+        if Path(path).suffix in [".json", ".txt"]
+    ]
+    for file in descriptor_list:
+        if not file.parent.samefile(processed_data_path):
+            print(f'copied file "{file}" to "{processed_data_path}"')
+            shutil.copy(file, processed_data_path)
+
+    return processed_data_path
+
+
 def dir2descriptor(directory, hop=1024, sr=44100):
     directory = Path(directory)
+    processed_data_path = process_descriptors(directory, hop, sr)
     data = []
-    for filename in directory.rglob("*.wav"):
-        print("processing:", filename)
-        descriptors = wav2descriptor(filename, hop=hop, sr=sr)
+    descriptor_list = [
+        path
+        for path in processed_data_path.rglob("*.*")
+        if Path(path).suffix in [".json", ".txt"]
+    ]
+    for filename in descriptor_list:
+        filename = Path(filename)
+        with open(filename) as t:
+            descriptors = json.load(t)
         data.append((str(filename), descriptors))
     return data
 

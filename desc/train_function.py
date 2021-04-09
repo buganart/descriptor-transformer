@@ -241,7 +241,9 @@ def main():
     print("test_data.shape", test_data.shape)
     pred = model.predict(test_data, 5)
     print("pred.shape", pred.shape)
-    save_descriptor_as_json(data_location, pred, fileindex, datamodule2)
+    save_descriptor_as_json(
+        Path(data_location) / "prediction", pred, fileindex, datamodule2
+    )
 
 
 if __name__ == "__main__":

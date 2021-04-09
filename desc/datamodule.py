@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torch.nn as nn
 import pytorch_lightning as pl
 
-from desc.helper_function import wav2descriptor, save_json, get_dataframe_from_json
+from desc.helper_function import process_descriptors, get_dataframe_from_json
 
 
 class DataModule_descriptor(pl.LightningDataModule):
@@ -39,33 +39,8 @@ class DataModule_descriptor(pl.LightningDataModule):
         std = x.std(axis=0)
         return np.array(x[(np.abs(x - mean) < std * 5).all(axis=1), :])
 
-    def prepare_data(self):
-        # find .wav files
-        wav_list = self.data_path.rglob("*.wav")
-        descriptor_list = [
-            path.stem
-            for path in self.data_path.rglob("*.*")
-            if Path(path).suffix in [".json", ".txt"]
-        ]
-        if hasattr(self.config, "hop_length"):
-            hop_length = self.config.hop_length
-        else:
-            hop_length = 1024
-
-        if hasattr(self.config, "sr"):
-            sr = self.config.sr
-        else:
-            sr = 44100
-
-        for wav_path in wav_list:
-            if wav_path.stem not in descriptor_list:
-                descriptors = wav2descriptor(wav_path, hop=hop_length, sr=sr)
-                savefile = (
-                    wav_path.parent
-                    / "processed_descriptors"
-                    / (str(wav_path.stem) + ".json")
-                )
-                save_json(savefile, descriptors)
+    # def prepare_data(self):
+    #     pass
 
     def _load_descriptor_list(self, path):
         df = get_dataframe_from_json(path)
@@ -93,7 +68,16 @@ class DataModule_descriptor(pl.LightningDataModule):
         return input_array
 
     def setup(self, stage=None):
-        self.prepare_data()
+        if hasattr(self.config, "hop_length"):
+            hop_length = self.config.hop_length
+        else:
+            hop_length = 1024
+
+        if hasattr(self.config, "sr"):
+            sr = self.config.sr
+        else:
+            sr = 44100
+        process_descriptors(self.data_path, hop_length, sr)
         window_size = self.window_size
         filepath_list = self.data_path.rglob("*.*")
         # check files in filepath_list is supported (by extensions)
