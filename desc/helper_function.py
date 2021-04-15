@@ -74,7 +74,12 @@ def wav2descriptor(filename, hop=1024, sr=44100):
 def process_descriptors(data_path, hop_length, sr):
     # find .wav files
     data_path = Path(data_path)
-    wav_list = data_path.rglob("*.wav")
+    supported_extensions = set([".wav", ".aif", ".aiff", ".mp3", ".m4a"])
+    wav_list = [
+        path
+        for path in data_path.rglob("*.*")
+        if Path(path).suffix in supported_extensions
+    ]
 
     descriptor_list = [
         path.stem
