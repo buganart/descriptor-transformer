@@ -16,6 +16,9 @@ The prediction workflow can be described in the diagram below:
 
 ### Optional: unagan generate notebook
 
-The unagan generate notebook is for generating lots of audios to form audio database in case the user does not have their database for the descriptor model predict notebook. The notebook has pretrained unagan to generate mel spectrogram and pretrained melgan to convert the spectrogram back to audios. The unagan and melgan are trained based on our custom dataset. ~~If the user want to train melgan and unagan with their own dataset, please go to the [melgan notebook](https://github.com/buganart/descriptor-transformer/blob/main/train_notebook/melgan.ipynb) and [unagan notebook](https://github.com/buganart/descriptor-transformer/blob/main/train_notebook/unagan.ipynb). ~~
+The unagan generate notebook is for generating lots of audios to form audio database in case the user does not have their database for the descriptor model predict notebook. The notebook has pretrained unagan to generate mel spectrogram and pretrained melgan to convert the spectrogram back to audios. The unagan and melgan are trained based on our custom dataset. 
+
+~~If the user want to train melgan and unagan with their own dataset, please go to the [melgan notebook](https://github.com/buganart/descriptor-transformer/blob/main/train_notebook/melgan.ipynb) and [unagan notebook](https://github.com/buganart/descriptor-transformer/blob/main/train_notebook/unagan.ipynb).~~
+
 The melgan and unagan training is still not available to users that do not have access to wandb project repository **demiurge/melgan** and **demiurge/unagan**.
 
