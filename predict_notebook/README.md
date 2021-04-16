@@ -7,7 +7,7 @@ After the descriptor model is trained with the [train notebook](https://github.c
 
 The prediction workflow can be described in the diagram below:
 
-![descriptor workflow](https://github.com/buganart/descriptor-transformer/tree/main/_static/img/descriptor_model_predict_workflow.png)
+![descriptor workflow](https://github.com/buganart/descriptor-transformer/blob/main/_static/img/descriptor_model_predict_workflow.png)
 
 1. The prediction database will be processed into descriptor input (descriptor database II) for the descriptor model, and the descriptor model will predict the subsequent descriptors based on the input.
 2. The audio database will be processed into descriptor database I that each descriptor will have ID reference back to the audio segment. 
