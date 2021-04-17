@@ -6,7 +6,7 @@ While the descriptor model is necessary for the **descriptor prediction** and ge
 
 NOTE: The melgan and unagan training is still not available to users that do not have access to wandb project repository **demiurge/melgan** and **demiurge/unagan**.
 
-## Description
+## Description of the prediction workflow
 
 The prediction workflow can be described in the diagram below:
 
