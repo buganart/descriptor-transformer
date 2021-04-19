@@ -81,7 +81,12 @@ def process_descriptors(data_path, hop_length, sr):
     #     if Path(path).suffix in supported_extensions
     # ]
     # decided to only support .wav
-    wav_list = data_path.rglob("*.wav")
+    supported_extensions = set([".wav"])
+    wav_list = [
+        path
+        for path in data_path.rglob("*.*")
+        if Path(path).suffix.lower() in supported_extensions
+    ]
 
     descriptor_list = [
         path.stem
