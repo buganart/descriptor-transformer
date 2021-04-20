@@ -198,7 +198,7 @@ def parse_args():
     parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--remove_outliers", type=bool, default=True)
     parser.add_argument("--selected_model", type=str, default="LSTM")
-    parser.add_argument("--descriptor_size", type=int, default=5)
+    parser.add_argument("--descriptor_size", type=int, default=39)
     parser.add_argument("--dim_pos_encoding", type=int, default=50)
     parser.add_argument("--nhead", type=int, default=5)
     parser.add_argument("--num_encoder_layers", type=int, default=1)

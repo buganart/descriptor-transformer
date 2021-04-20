@@ -43,30 +43,39 @@ def wav2descriptor(filename, hop=1024, sr=44100):
     filename = Path(filename)
     descriptors = []
     y, sr = librosa.load(filename, sr=sr)
-    cent = np.ndarray.flatten(
-        librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=hop)
-    )
-    flat = np.ndarray.flatten(librosa.feature.spectral_flatness(y=y, hop_length=hop))
-    rolloff = np.ndarray.flatten(
-        librosa.feature.spectral_rolloff(y=y, sr=sr, hop_length=hop)
-    )
-    rms = np.ndarray.flatten(librosa.feature.rms(y=y, hop_length=hop))
-    f0 = np.ndarray.flatten(librosa.yin(y, 80, 10000, hop_length=hop))
 
-    num_descriptors = cent.shape[0]
+    mfccs_o = librosa.feature.mfcc(y=y, n_mfcc=13, sr=sr, hop_length=hop)
+    mfccs_d1 = librosa.feature.delta(mfccs_o)
+    mfccs_d2 = librosa.feature.delta(mfccs_o, order=2)
+    mfccs = np.concatenate((mfccs_o, mfccs_d1, mfccs_d2))
+    mfccs = np.transpose(mfccs)
+    num_descriptors, num_features = mfccs.shape
+
+    # cent = np.ndarray.flatten(
+    #     librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=hop)
+    # )
+    # flat = np.ndarray.flatten(librosa.feature.spectral_flatness(y=y, hop_length=hop))
+    # rolloff = np.ndarray.flatten(
+    #     librosa.feature.spectral_rolloff(y=y, sr=sr, hop_length=hop)
+    # )
+    # rms = np.ndarray.flatten(librosa.feature.rms(y=y, hop_length=hop))
+    # f0 = np.ndarray.flatten(librosa.yin(y, 80, 10000, hop_length=hop))
 
     id = [str(filename)] * num_descriptors
     sample = np.arange(num_descriptors) * hop
 
+    # "cent": cent.tolist(),
+    # "flat": flat.tolist(),
+    # "rolloff": rolloff.tolist(),
+    # "rms": rms.tolist(),
+    # "f0": f0.tolist(),
     descriptors = {
-        "cent": cent.tolist(),
-        "flat": flat.tolist(),
-        "rolloff": rolloff.tolist(),
-        "rms": rms.tolist(),
-        "f0": f0.tolist(),
         "_id": id,
         "_sample": sample.tolist(),
     }
+
+    for i in range(num_features):
+        descriptors["mfcc" + str(i)] = mfccs[:, i].tolist()
 
     return descriptors
 
@@ -101,7 +110,8 @@ def process_descriptors(data_path, hop_length, sr):
     for wav_path in wav_list:
         if wav_path.stem not in descriptor_list:
             descriptors = wav2descriptor(wav_path, hop=hop_length, sr=sr)
-            num_descriptors = len(descriptors["cent"])
+            dict_key1 = list(descriptors.keys())[0]
+            num_descriptors = len(descriptors[dict_key1])
             print(f"processed {wav_path}. number of descriptors: {num_descriptors}")
             savefile = processed_data_path / (str(wav_path.stem) + ".json")
             save_json(savefile, descriptors)
