@@ -31,7 +31,7 @@ and [direnv](https://direnv.net/).
 3. Type `direnv allow` from within the checkout of this repository. -->
 
 ## Description
-*Demiurge* is a tri-modal Generative Adversarial Network (Goodfellow et al. 2014) architecture devised to generate and sequence musical sounds in the waveform domain (Donahue et al. 2019). The architecture combines a sound generating UnaGAN plus MelGAN model with a custom GAN sequencer. The diagram below explains the relation between the different elements.
+*Demiurge* is a tri-modal Generative Adversarial Network (Goodfellow et al. 2014) architecture devised to generate and sequence musical sounds in the waveform domain (Donahue et al. 2019). The architecture combines a sound-generating UnaGAN plus MelGAN model with a custom GAN sequencer. The diagram below explains the relation between the different elements.
 ![project concept](https://github.com/buganart/descriptor-transformer/blob/main/_static/img/project_script_dataflow.png)
 
 The project purpose is to generate predicted audio following the given input audio files. From the picture, the input audio files are stored in the RECORDED AUDIO DB. 
