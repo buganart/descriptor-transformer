@@ -220,7 +220,14 @@ class RealTimeProcessDataset(Dataset):
 
         sample = self.data_list[sample_index]
         sample_length = len(sample)
-        window_index = np.random.randint(0, sample_length - self.window_size)
+        if sample_length - self.window_size < 0:
+            print(
+                f"sample_length{sample_length} is smaller than window_size{self.window_size}"
+            )
+        if sample_length - self.window_size == 0:
+            window_index = 0
+        else:
+            window_index = np.random.randint(0, sample_length - self.window_size)
         item = sample[window_index : window_index + self.window_size]
 
         return torch.tensor(np.array(item)[np.newaxis, :, :], dtype=self.dtype)
