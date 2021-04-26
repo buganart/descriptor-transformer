@@ -182,6 +182,7 @@ def train(config, run, model, dataModule, extra_trainer_args):
 
 
 def parse_args():
+    # ../../../data/violin/MINI_TESTS
     parser = ArgumentParser()
     parser.add_argument(
         "--audio_db_dir", type=str, default="../../music_sample/TESTING"

@@ -16,7 +16,7 @@ class SaveWandbCallback(Callback):
     def __init__(self, log_interval, save_model_path):
         super().__init__()
         self.log_interval = log_interval
-        self.save_model_path = Path(save_model_path)
+        self.save_model_path = str(save_model_path)
 
     def on_train_epoch_end(self, trainer, pl_module, outputs):
         if trainer.current_epoch % self.log_interval == 0:
