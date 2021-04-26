@@ -101,11 +101,11 @@ class DataModule_descriptor(pl.LightningDataModule):
             if self.remove_outliers:
                 des_array = self._remove_outliers_fn(des_array)
                 # record all descriptor for statistics
-            all_desc.append(des_array)
             num_des = des_array.shape[0]
             # print(f"{str(path.stem)[:20]} file number of descriptors:", num_des)
             if num_des <= window_size + 1:
                 continue
+            all_desc.append(des_array)
             if self.isTrain:
                 if self.process_on_the_fly:
                     continue
