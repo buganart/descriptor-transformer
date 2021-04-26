@@ -6,7 +6,7 @@ import torch.nn as nn
 import pytorch_lightning as pl
 
 from pathlib import Path
-from argparse import Namespace
+from argparse import ArgumentParser, Namespace
 import json
 
 from pytorch_lightning.callbacks.base import Callback
@@ -87,11 +87,11 @@ def init_wandb_run(config, run_dir="./", mode="run"):
     return run
 
 
-def setup_datamodule(config, run, isTrain=True):
+def setup_datamodule(config, run, isTrain=True, process_on_the_fly=True):
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
 
-    dataModule = DataModule_descriptor(config, isTrain)
+    dataModule = DataModule_descriptor(config, isTrain, process_on_the_fly)
     dataModule.setup()
     if isTrain:
         # save mean std to npz
@@ -181,34 +181,67 @@ def train(config, run, model, dataModule, extra_trainer_args):
     trainer.fit(model, dataModule)
 
 
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--audio_db_dir", type=str, default="../../music_sample/TESTING"
+    )
+    parser.add_argument("--offline", type=bool, default=False)
+    parser.add_argument("--experiment_dir", type=str, default="../")
+    parser.add_argument("--resume_run_id", type=str, default="")
+    parser.add_argument("--window_size", type=int, default=10)
+    parser.add_argument("--forecast_size", type=int, default=3)
+    parser.add_argument("--learning_rate", type=float, default=1e-4)
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--epochs", type=int, default=1000)
+    parser.add_argument("--save_interval", type=int, default=2)
+    parser.add_argument("--notes", type=str, default="")
+    parser.add_argument("--hidden_size", type=int, default=100)
+    parser.add_argument("--num_layers", type=int, default=3)
+    parser.add_argument("--remove_outliers", type=bool, default=True)
+    parser.add_argument("--selected_model", type=str, default="LSTM")
+    parser.add_argument("--descriptor_size", type=int, default=39)
+    parser.add_argument("--dim_pos_encoding", type=int, default=50)
+    parser.add_argument("--nhead", type=int, default=5)
+    parser.add_argument("--num_encoder_layers", type=int, default=1)
+    parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--positional_encoding_dropout", type=int, default=0)
+    parser.add_argument("--dim_feedforward", type=int, default=128)
+    args = parser.parse_args()
+    return args
+
+
 # sample script
 def main():
-    data_location = "../tests/"
-    config_dict = dict(
-        audio_db_dir=data_location,
-        experiment_dir="../",
-        resume_run_id="",
-        window_size=10,
-        forecast_size=3,
-        learning_rate=1e-4,
-        batch_size=16,
-        epochs=3,
-        save_interval=2,
-        notes="",
-        hidden_size=100,
-        num_layers=3,
-        remove_outliers=True,
-        selected_model="LSTM",
-        descriptor_size=5,
-        dim_pos_encoding=50,
-        nhead=5,
-        num_encoder_layers=1,
-        dropout=0.1,
-        positional_encoding_dropout=0,
-        dim_feedforward=128,
-    )
+    # data_location = "../tests/samples_large"
+    # data_location = "../../music_sample/TESTING"
+    # config_dict = dict(
+    #     audio_db_dir=data_location,
+    #     experiment_dir="../",
+    #     resume_run_id="",
+    #     window_size=10,
+    #     forecast_size=3,
+    #     learning_rate=1e-4,
+    #     batch_size=16,
+    #     epochs=1,
+    #     save_interval=2,
+    #     notes="",
+    #     hidden_size=100,
+    #     num_layers=3,
+    #     remove_outliers=True,
+    #     selected_model="LSTM",
+    #     descriptor_size=5,
+    #     dim_pos_encoding=50,
+    #     nhead=5,
+    #     num_encoder_layers=1,
+    #     dropout=0.1,
+    #     positional_encoding_dropout=0,
+    #     dim_feedforward=128,
+    # )
+    # config = Namespace(**config_dict)
 
-    config = Namespace(**config_dict)
+    config = parse_args()
+
     config.seed = 1234
     if config.selected_model not in ["LSTMEncoderDecoderModel", "TransformerModel"]:
         config.forecast_size = 0
@@ -217,34 +250,35 @@ def main():
     # run offline
     os.environ["WANDB_MODE"] = "dryrun"
 
-    run = init_wandb_run(config, run_dir=config.experiment_dir, mode="offline")
-    datamodule = setup_datamodule(config, run)
+    if config.offline:
+        mode = "offline"
+    else:
+        mode = "run"
+
+    run = init_wandb_run(config, run_dir=config.experiment_dir, mode=mode)
+    datamodule = setup_datamodule(config, run, isTrain=True, process_on_the_fly=False)
     model, extra_trainer_args = setup_model(config, run)
     train(config, run, model, datamodule, extra_trainer_args)
 
     #########
     # predict
     #########
-    # config = get_resume_run_config(resume_run_id)
-    # config.resume_run_id = resume_run_id
-    # run = init_wandb_run(config, run_dir="./", mode="offline")
-    # model, _ = setup_model(config, run)
     model.eval()
     # # construct test_data
-
-    # testdatamodule = setup_datamodule(config, run, isTrain=False)
-    # test_dataloader = testdatamodule.test_dataloader(
-    #     datamodule.dataset_mean, datamodule.dataset_std
-    # )
-    # test_data, filenames = next(iter(test_dataloader))
     config.window_size = 15
-    datamodule2 = setup_datamodule(config, run)
-    test_dataloader = datamodule2.train_dataloader()
-    test_data = next(iter(test_dataloader))[0]
+    datamodule2 = DataModule_descriptor(config, isTrain=False)
+    datamodule2.setup()
+    datamodule2.dataset_mean = datamodule.dataset_mean
+    datamodule2.dataset_std = datamodule.dataset_std
+
+    test_dataloader = datamodule2.test_dataloader()
+    test_data, fileindex = next(iter(test_dataloader))
     print("test_data.shape", test_data.shape)
     pred = model.predict(test_data, 5)
     print("pred.shape", pred.shape)
-    # save_descriptor_as_json(data_location, prediction, audio_info)
+    save_descriptor_as_json(
+        Path(data_location) / "prediction", pred, fileindex, datamodule2
+    )
 
 
 if __name__ == "__main__":
