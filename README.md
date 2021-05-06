@@ -8,26 +8,6 @@
 
     pip install -e .
 
-
-### Install package and development tools
-
-Install `python >= 3.6` and `pytorch` with GPU support if desired.
-
-    pip install -r requirements.txt
-
-
-<!-- Run the tests
-
-    pytest -->
-
-<!-- 
-### Option 2: Using nix and direnv
-
-1. Install the [nix](https://nixos.org/download.html) package manager
-and [direnv](https://direnv.net/).
-2. [Hook](https://direnv.net/docs/hook.html) `direnv` into your shell.
-3. Type `direnv allow` from within the checkout of this repository. -->
-
 ## INTRODUCTION
 *Demiurge* is a tripartite neural network architecture devised to generate and sequence audio waveforms (Donahue et al. 2019). The architecture combines a synthesis engine based on a **UNAGAN** + **melGAN** model with a custom **transformer-based sequencer**. The diagram below explains the relation between the different elements.
 
@@ -55,7 +35,7 @@ The chart below explains the GAN-based sound synthesis process. Please bear in m
 
 ### 1. melGAN
 
-**[melGAN](https://github.com/buganart/melgan-neurips)**  (Kumar et al. 2019) is a fully convolutional non-autoregressive feed-forward adversarial network that uses mel-spectrograms as a lower-resolution audio representation model that can be both efficiently computed from and inverted back to raw audio format. An average melGAN run on [Google Colab](https://colab.research.google.com/) using a single V100 GPU may need a week to produce satisfactory results. The results obtained using a multi-GPU approach with parallel data vary. To train the model please use the following [notebook](https://colab.research.google.com/drive/1xUrh2pNUBTMO4s4YPsxAbUdTdlHjTeVU?usp=sharing).
+**[melGAN](https://github.com/buganart/melgan-neurips)**  (Kumar et al. 2019) is a fully convolutional non-autoregressive feed-forward adversarial network that uses mel-spectrograms as a lower-resolution audio representation model that can be both efficiently computed from and inverted back to raw audio format. An average melGAN run on [Google Colab](https://colab.research.google.com/) using a single V100 GPU may need a week to produce satisfactory results. The results obtained using a multi-GPU approach with parallel data vary. To train the model please use the following [notebook](https://github.com/buganart/descriptor-transformer/blob/main/train_notebook/melgan.ipynb).
 
 <p align="center">
     <img src="https://user-images.githubusercontent.com/68105693/115818429-53b94100-a42f-11eb-9cb5-1c6c20ba5243.png" width="70%" height="30%" align="center">
@@ -63,7 +43,7 @@ The chart below explains the GAN-based sound synthesis process. Please bear in m
 
 ### 2. UNAGAN
 
-**[UNAGAN](https://github.com/buganart/unagan)** (Liu et al. 2019) is an auto-regressive unconditional sound generating boundary-equilibrium GAN (Berthelot et al. 2017) that takes variable-length sequences of noise vectors to produce variable-length mel-spectrograms. A first UNAGAN model was eventually revised by Liu et al. at [Academia Sinica](https://musicai.citi.sinica.edu.tw) to improve the resultant audio quality by introducing in the generator a hierarchical architecture  model and circle regularization to avoid mode collapse. The model produces satisfactory results after 2 days of training on a single V100 GPU. The results obtained using a multi-GPU approach with parallel data vary. To train the model please use the following [notebook](https://colab.research.google.com/drive/1JEXcGs-zVoAi84e79OO-7_G9qD3ptNwF?usp=sharing).
+**[UNAGAN](https://github.com/buganart/unagan)** (Liu et al. 2019) is an auto-regressive unconditional sound generating boundary-equilibrium GAN (Berthelot et al. 2017) that takes variable-length sequences of noise vectors to produce variable-length mel-spectrograms. A first UNAGAN model was eventually revised by Liu et al. at [Academia Sinica](https://musicai.citi.sinica.edu.tw) to improve the resultant audio quality by introducing in the generator a hierarchical architecture  model and circle regularization to avoid mode collapse. The model produces satisfactory results after 2 days of training on a single V100 GPU. The results obtained using a multi-GPU approach with parallel data vary. To train the model please use the following [notebook](https://github.com/buganart/descriptor-transformer/blob/main/train_notebook/unagan.ipynb).
 
 ### 3. Generator
 
@@ -88,7 +68,7 @@ Four different time-series predictors were implemented as training options. Both
 - **Transformer encoder-only model**
 -  **Transformer model** (Vaswani et al. 2017)
 
-Once you train the model, record the `wandb_run_id` and paste it in the **[prediction notebook](https://github.com/buganart/descriptor-transformer/blob/main/predict_notebook/descriptor_model_predict.ipynb)**. Then, provide paths to the `RAW generated audio DB` and `Prediction DB` databases and and run the notebook to generate new descriptors. The descriptors genereted from `Prediction DB` will be used as the input of the neural sequencer to predict subsequent descriptors, which will be converted into `.wav` audio files using the **query and playback engines** (see below). To train the model please use the following [notebook](https://colab.research.google.com/drive/1xUrh2pNUBTMO4s4YPsxAbUdTdlHjTeVU?usp=sharing).
+Once you train the model, record the `wandb_run_id` and paste it in the **[prediction notebook](https://github.com/buganart/descriptor-transformer/blob/main/predict_notebook/descriptor_model_predict.ipynb)**. Then, provide paths to the `RAW generated audio DB` and `Prediction DB` databases and and run the notebook to generate new descriptors. The descriptors genereted from `Prediction DB` will be used as the input of the neural sequencer to predict subsequent descriptors, which will be converted into `.wav` audio files using the **query and playback engines** (see below). To train the model please use the following [notebook](https://github.com/buganart/descriptor-transformer/blob/main/train_notebook/descriptor_model_train.ipynb).
 
 #### Training (script alternative)
 
@@ -109,7 +89,7 @@ This is the workflow of the **query and playback engines**, which will translate
 
 4. The model combines and merges these segments referenced by the replaced descriptors from the query function into a new `.wav` audio file.
 
-To train the model please use the following [notebook](https://colab.research.google.com/drive/1xUrh2pNUBTMO4s4YPsxAbUdTdlHjTeVU?usp=sharing).
+To train the model please use the following [notebook](https://github.com/buganart/descriptor-transformer/blob/main/train_notebook/descriptor_model_train.ipynb).
 
 
 
