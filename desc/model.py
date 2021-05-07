@@ -30,7 +30,7 @@ class SimpleLSTMModel(pl.LightningModule):
 
         self.model_ep_loss_list = []
 
-    def on_train_epoch_end(self, epoch_output):
+    def on_train_epoch_end(self, epoch_output=None):
         log_dict = {"epoch": self.current_epoch}
 
         loss = np.mean(self.model_ep_loss_list)
@@ -142,7 +142,7 @@ class LSTMEncoderDecoderModel(pl.LightningModule):
 
         self.model_ep_loss_list = []
 
-    def on_train_epoch_end(self, epoch_output):
+    def on_train_epoch_end(self, epoch_output=None):
         log_dict = {"epoch": self.current_epoch}
 
         loss = np.mean(self.model_ep_loss_list)
@@ -244,7 +244,7 @@ class TransformerEncoderOnlyModel(pl.LightningModule):
 
         self.model_ep_loss_list = []
 
-    def on_train_epoch_end(self, epoch_output):
+    def on_train_epoch_end(self, epoch_output=None):
         log_dict = {"epoch": self.current_epoch}
 
         loss = np.mean(self.model_ep_loss_list)
@@ -358,7 +358,7 @@ class TransformerModel(pl.LightningModule):
         self.loss_function = nn.MSELoss()
         self.model_ep_loss_list = []
 
-    def on_train_epoch_end(self, epoch_output):
+    def on_train_epoch_end(self, epoch_output=None):
         log_dict = {"epoch": self.current_epoch}
 
         loss = np.mean(self.model_ep_loss_list)
