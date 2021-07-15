@@ -43,7 +43,12 @@ class DataModule_descriptor(pl.LightningDataModule):
     #     pass
 
     def _load_descriptor_list(self, path):
-        df = get_dataframe_from_json(path)
+        try:
+            df = get_dataframe_from_json(path)
+        except Exception as e:
+            print(e)
+            print(f"reading {path} failed!")
+            return None
         if len(self.attribute_list) == 0:
             columns = df.columns.tolist()
             # remove unnecessary columns
