@@ -45,22 +45,23 @@ class DataModule_descriptor(pl.LightningDataModule):
     def _load_descriptor_list(self, path):
         try:
             df = get_dataframe_from_json(path)
+            if len(self.attribute_list) == 0:
+                columns = df.columns.tolist()
+                # remove unnecessary columns
+                for c in columns:
+                    if "_" not in c:
+                        self.attribute_list.append(c)
+                self.attribute_list = sorted(self.attribute_list)
+            # remove unnecessary columns from dataframe
+            df = df.loc[:, self.attribute_list]
+            des_array = df.to_numpy(dtype=np.float32)
+            if des_array.shape[0] == 0:
+                return None
         except Exception as e:
             print(e)
             print(f"reading {path} failed!")
             return None
-        if len(self.attribute_list) == 0:
-            columns = df.columns.tolist()
-            # remove unnecessary columns
-            for c in columns:
-                if "_" not in c:
-                    self.attribute_list.append(c)
-            self.attribute_list = sorted(self.attribute_list)
-        # remove unnecessary columns from dataframe
-        df = df.loc[:, self.attribute_list]
-        des_array = df.to_numpy(dtype=np.float32)
-        if des_array.shape[0] == 0:
-            return None
+
         return des_array
 
     def _descriptor_batchify(self, des_array, window_size):
