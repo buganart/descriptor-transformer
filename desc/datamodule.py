@@ -108,7 +108,7 @@ class DataModule_descriptor(pl.LightningDataModule):
                 des_array = self._remove_outliers_fn(des_array)
                 # record all descriptor for statistics
             num_des = des_array.shape[0]
-            # print(f"{str(path.stem)[:20]} file number of descriptors:", num_des)
+            print(f"{str(path.stem)[:20]}, number of descriptors:", num_des)
             if num_des <= window_size + 1:
                 continue
             all_desc.append(des_array)
